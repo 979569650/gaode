@@ -3,10 +3,34 @@
 <head>
 <meta name="viewport" content="width=device-width initial-scale=1.0 maximum-scale=1.0 user-scalable=0">
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link rel="icon" href="data:,">
 <title>3D地图</title>
 <style>
-body,html{margin:0;padding:0;font:12px/16px Verdana,Helvetica,Arial,sans-serif;width:100%;height:100%}
+body,html{margin:0;padding:0;font:12px/16px Verdana,Helvetica,Arial,sans-serif;width:100%;height:100%;background:#030814}
+body::before,
+body::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+}
+body::before{
+  z-index:22;
+  background:
+    linear-gradient(180deg, rgba(1,6,18,0.46) 0%, rgba(1,7,20,0.05) 28%, rgba(0,3,10,0.18) 100%),
+    radial-gradient(ellipse at 52% 55%, rgba(0,58,160,0) 0%, rgba(1,9,23,0.08) 54%, rgba(0,0,0,0.5) 100%);
+  mix-blend-mode:multiply;
+}
+body::after{
+  z-index:23;
+  opacity:0.18;
+  background:
+    repeating-linear-gradient(0deg, rgba(86,170,255,0.18) 0, rgba(86,170,255,0.18) 1px, transparent 1px, transparent 34px),
+    linear-gradient(90deg, rgba(0,0,0,0.18), rgba(67,157,255,0.04) 48%, rgba(0,0,0,0.22));
+  mix-blend-mode:screen;
+}
 .container{height:100%}
+#container{background:#030814}
 .panel{
   position:fixed;
   left:12px;
@@ -14,30 +38,36 @@ body,html{margin:0;padding:0;font:12px/16px Verdana,Helvetica,Arial,sans-serif;w
   z-index:40;
   display:flex;
   flex-wrap:wrap;
-  gap:8px;
+  gap:7px;
   align-items:center;
-  padding:10px;
-  max-width:min(760px, calc(100vw - 24px));
-  background:rgba(255,255,255,0.92);
-  border:1px solid rgba(34,34,34,0.08);
-  border-radius:8px;
-  box-shadow:0 8px 24px rgba(0,0,0,0.12);
+  padding:8px;
+  max-width:min(660px, calc(100vw - 24px));
+  background:rgba(3,10,23,0.68);
+  border:1px solid rgba(78,150,238,0.22);
+  border-radius:6px;
+  box-shadow:0 12px 32px rgba(0,0,0,0.38);
+  backdrop-filter:blur(10px);
 }
 .panel button,
 .panel select{
-  height:32px;
-  padding:0 10px;
-  border:1px solid #d9d9d9;
+  height:30px;
+  padding:0 9px;
+  border:1px solid rgba(87,157,239,0.36);
   border-radius:4px;
-  background:#fff;
-  color:#333;
-  font-size:13px;
+  background:rgba(7,22,45,0.86);
+  color:#dceeff;
+  font-size:12px;
 }
 .panel button{cursor:pointer}
+.panel button:hover,
+.panel select:hover{
+  border-color:rgba(113,197,255,0.86);
+  background:rgba(14,47,84,0.94);
+}
 .panel button:disabled{cursor:not-allowed;opacity:.45}
 .panel .hint{
   flex:1 1 100%;
-  color:#666;
+  color:#8fb3d0;
   font-size:12px;
 }
 .badge{
@@ -46,9 +76,23 @@ body,html{margin:0;padding:0;font:12px/16px Verdana,Helvetica,Arial,sans-serif;w
   height:24px;
   padding:0 10px;
   border-radius:999px;
-  background:#f3f6fb;
-  color:#355ea8;
-  border:1px solid #d9e3f3;
+  background:rgba(0,74,168,0.26);
+  color:#b6dcff;
+  border:1px solid rgba(92,168,246,0.38);
+  text-shadow:0 0 8px rgba(52,134,230,0.55);
+}
+@media (max-width: 720px){
+  .panel{
+    left:8px;
+    right:8px;
+    top:8px;
+    max-width:none;
+  }
+  .panel button,
+  .panel select{
+    flex:1 1 auto;
+    min-width:118px;
+  }
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.9.2/dist/proj4.js"></script>
@@ -74,27 +118,45 @@ body,html{margin:0;padding:0;font:12px/16px Verdana,Helvetica,Arial,sans-serif;w
 var DXF_FILE_NAME = '宽厚里.dxf';
 var WGS84 = 'WGS84';
 var VIEW_PRESET = {
-  pitch: 50,
-  rotation: -15
+  center: [116.333926, 39.997245],
+  zoom: 17.15,
+  pitch: 64,
+  rotation: -28,
+  fitZoom: 17.35,
+  fitPadding: [112, 84, 78, 78]
+};
+var BUILDING_LAYER_STYLE = {
+  wallColor: 'rgba(0, 44, 145, 0.78)',
+  roofColor: 'rgba(103, 174, 226, 0.9)',
+  focusWallColor: 'rgba(0, 56, 188, 0.82)',
+  focusRoofColor: 'rgba(122, 194, 241, 0.94)',
+  heightFactor: 1.62,
+  opacity: 0.98,
+  focusPaddingRatio: 0.34,
+  minFocusPadding: 0.004
 };
 var PIPELINE_STYLE = {
-  baseColor: '#3b1200',
-  baseOpacity: 0.48,
-  baseWeight: 6,
-  strokeColor: '#ff6a00',
-  strokeOpacity: 0.98,
-  strokeWeight: 3,
+  baseColor: '#120600',
+  baseOpacity: 0.46,
+  baseWeight: 5,
+  glowColor: '#ffb13c',
+  glowOpacity: 0.34,
+  glowWeight: 3.8,
+  strokeColor: '#ff8a16',
+  strokeOpacity: 0.9,
+  strokeWeight: 2.4,
   lineJoin: 'miter',
   lineCap: 'butt',
-  zIndexBase: 120,
-  zIndexTop: 126
+  zIndexBase: 220,
+  zIndexGlow: 224,
+  zIndexTop: 228
 };
 var VALVE_STYLE = {
-  symbolColor: '#ff6a00',
-  borderColor: '#3b1200',
-  textColor: '#ffb366',
-  haloColor: 'rgba(18, 8, 0, 0.84)',
-  zIndex: 140
+  symbolColor: '#ff8a00',
+  borderColor: '#160700',
+  textColor: '#ffd28b',
+  haloColor: 'rgba(18, 8, 0, 0.92)',
+  zIndex: 240
 };
 var VALVE_KEYWORDS = ['阀'];
 var SEGMENT_MERGE_TOLERANCE = 0.8;
@@ -117,6 +179,7 @@ var CRS_DEFS = {
   }
 };
 var map;
+var buildingLayer;
 var dxfOverlays = [];
 var currentDxfText = '';
 var currentProjectionId = 'cgcs2000-gk-117';
@@ -127,13 +190,17 @@ function mapInit(){
   map = new AMap.Map('container', {
     rotateEnable:true,
     pitchEnable:true,
-    zoom:17,
-    pitch:50,
-    rotation:-15,
+    zoom:VIEW_PRESET.zoom,
+    pitch:VIEW_PRESET.pitch,
+    rotation:VIEW_PRESET.rotation,
     viewMode:'3D',
     zooms:[2,20],
-    center:[116.333926,39.997245]
+    center:VIEW_PRESET.center,
+    showLabel:false,
+    mapStyle:'amap://styles/darkblue'
   });
+
+  addCityBuildingLayer();
 
   var controlBar = new AMap.ControlBar({
     position:{
@@ -153,6 +220,96 @@ function mapInit(){
 
   initPipelineTools();
   loadDefaultDxf();
+}
+
+function addCityBuildingLayer(){
+  if (!AMap.Buildings) {
+    console.warn('AMap.Buildings is not available in the current JSAPI runtime.');
+    return;
+  }
+
+  buildingLayer = new AMap.Buildings({
+    zIndex: 100,
+    opacity: BUILDING_LAYER_STYLE.opacity,
+    zooms: [14, 20],
+    heightFactor: BUILDING_LAYER_STYLE.heightFactor,
+    wallColor: BUILDING_LAYER_STYLE.wallColor,
+    roofColor: BUILDING_LAYER_STYLE.roofColor
+  });
+  map.addLayer(buildingLayer);
+}
+
+function applyBuildingFocusStyle(projected){
+  if (!buildingLayer || typeof buildingLayer.setStyle !== 'function') return;
+
+  var focusPath = createBuildingFocusPath(projected);
+  if (!focusPath) return;
+
+  buildingLayer.setStyle({
+    hideWithoutStyle: false,
+    areas: [{
+      visible: true,
+      rejectTexture: false,
+      color1: BUILDING_LAYER_STYLE.focusRoofColor,
+      color2: BUILDING_LAYER_STYLE.focusWallColor,
+      path: focusPath
+    }]
+  });
+
+  if (typeof buildingLayer.setOpacity === 'function') {
+    buildingLayer.setOpacity(BUILDING_LAYER_STYLE.opacity);
+  }
+}
+
+function createBuildingFocusPath(projected){
+  var bounds = getProjectedBounds(projected);
+  if (!bounds) return null;
+
+  var width = bounds.maxLng - bounds.minLng;
+  var height = bounds.maxLat - bounds.minLat;
+  var lngPad = Math.max(width * BUILDING_LAYER_STYLE.focusPaddingRatio, BUILDING_LAYER_STYLE.minFocusPadding);
+  var latPad = Math.max(height * BUILDING_LAYER_STYLE.focusPaddingRatio, BUILDING_LAYER_STYLE.minFocusPadding);
+
+  return [
+    [bounds.minLng - lngPad, bounds.minLat - latPad],
+    [bounds.maxLng + lngPad, bounds.minLat - latPad],
+    [bounds.maxLng + lngPad, bounds.maxLat + latPad],
+    [bounds.minLng - lngPad, bounds.maxLat + latPad],
+    [bounds.minLng - lngPad, bounds.minLat - latPad]
+  ];
+}
+
+function getProjectedBounds(projected){
+  var bounds = null;
+
+  projected.features.forEach(function(feature){
+    feature.path.forEach(function(lnglat){
+      bounds = extendLngLatBounds(bounds, lnglat);
+    });
+  });
+
+  projected.valves.forEach(function(valve){
+    bounds = extendLngLatBounds(bounds, valve.lnglat);
+  });
+
+  return bounds;
+}
+
+function extendLngLatBounds(bounds, lnglat){
+  if (!lnglat || !Number.isFinite(lnglat[0]) || !Number.isFinite(lnglat[1])) return bounds;
+  if (!bounds) {
+    return {
+      minLng: lnglat[0],
+      maxLng: lnglat[0],
+      minLat: lnglat[1],
+      maxLat: lnglat[1]
+    };
+  }
+  bounds.minLng = Math.min(bounds.minLng, lnglat[0]);
+  bounds.maxLng = Math.max(bounds.maxLng, lnglat[0]);
+  bounds.minLat = Math.min(bounds.minLat, lnglat[1]);
+  bounds.maxLat = Math.max(bounds.maxLat, lnglat[1]);
+  return bounds;
 }
 
 function registerProjectionDefs(){
@@ -255,6 +412,7 @@ function renderDxfText(dxfText, projectionId){
   }
 
   drawProjectedFeatures(projected);
+  applyBuildingFocusStyle(projected);
   document.getElementById('fitPipelineBtn').disabled = false;
   fitPipelineView();
   setStats(projected.features.length + ' 条管线 / ' + projected.valves.length + ' 个阀门');
@@ -632,6 +790,17 @@ function drawProjectedFeatures(projected){
 
     overlays.push(new AMap.Polyline({
       path: feature.path,
+      strokeColor: PIPELINE_STYLE.glowColor,
+      strokeOpacity: PIPELINE_STYLE.glowOpacity,
+      strokeWeight: PIPELINE_STYLE.glowWeight,
+      strokeStyle: 'solid',
+      lineJoin: PIPELINE_STYLE.lineJoin,
+      lineCap: PIPELINE_STYLE.lineCap,
+      zIndex: PIPELINE_STYLE.zIndexGlow
+    }));
+
+    overlays.push(new AMap.Polyline({
+      path: feature.path,
       strokeColor: PIPELINE_STYLE.strokeColor,
       strokeOpacity: PIPELINE_STYLE.strokeOpacity,
       strokeWeight: PIPELINE_STYLE.strokeWeight,
@@ -662,9 +831,9 @@ function createValveSymbol(valve){
       '<div style="' +
       'width:14px;height:14px;box-sizing:border-box;' +
       'border:2px solid ' + VALVE_STYLE.borderColor + ';' +
-      'background:' + VALVE_STYLE.symbolColor + ';' +
+      'background:radial-gradient(circle at 38% 34%, #ffd37a 0, ' + VALVE_STYLE.symbolColor + ' 58%, #b54400 100%);' +
       'transform:rotate(45deg);' +
-      'box-shadow:0 0 0 1px rgba(20,16,8,0.28);' +
+      'box-shadow:0 0 0 1px rgba(20,16,8,0.38),0 0 12px rgba(255,122,0,0.86);' +
       '"></div>'
   });
 }
@@ -695,11 +864,12 @@ function clearDxfOverlays(){
 
 function fitPipelineView(){
   if (!dxfOverlays.length) return;
-  map.setFitView(dxfOverlays, false, [90, 70, 70, 70]);
+  map.setFitView(dxfOverlays, false, VIEW_PRESET.fitPadding);
   window.setTimeout(function(){
+    if (typeof map.setZoom === 'function') map.setZoom(VIEW_PRESET.fitZoom);
     if (typeof map.setPitch === 'function') map.setPitch(VIEW_PRESET.pitch);
     if (typeof map.setRotation === 'function') map.setRotation(VIEW_PRESET.rotation);
-  }, 180);
+  }, 220);
 }
 
 function setStats(message){
