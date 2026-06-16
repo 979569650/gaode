@@ -5,8 +5,14 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <link rel="icon" href="data:,">
 <title>3D地图</title>
+<script>
+var IS_POSTER_MODE = new URLSearchParams(window.location.search).get('poster') === '1';
+if (IS_POSTER_MODE) {
+  document.documentElement.classList.add('poster-mode');
+}
+</script>
 <style>
-body,html{margin:0;padding:0;font:12px/16px Verdana,Helvetica,Arial,sans-serif;width:100%;height:100%;background:#030814}
+body,html{margin:0;padding:0;font:12px/16px Verdana,Helvetica,Arial,sans-serif;width:100%;height:100%;background:#dbe7ec}
 body::before,
 body::after{
   content:"";
@@ -17,20 +23,23 @@ body::after{
 body::before{
   z-index:22;
   background:
-    linear-gradient(180deg, rgba(1,6,18,0.46) 0%, rgba(1,7,20,0.05) 28%, rgba(0,3,10,0.18) 100%),
-    radial-gradient(ellipse at 52% 55%, rgba(0,58,160,0) 0%, rgba(1,9,23,0.08) 54%, rgba(0,0,0,0.5) 100%);
-  mix-blend-mode:multiply;
+    linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.02) 42%, rgba(46,58,64,0.1) 100%),
+    radial-gradient(ellipse at 52% 52%, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.01) 58%, rgba(40,48,52,0.16) 100%);
+  mix-blend-mode:screen;
 }
 body::after{
   z-index:23;
-  opacity:0.18;
+  opacity:0.06;
   background:
-    repeating-linear-gradient(0deg, rgba(86,170,255,0.18) 0, rgba(86,170,255,0.18) 1px, transparent 1px, transparent 34px),
-    linear-gradient(90deg, rgba(0,0,0,0.18), rgba(67,157,255,0.04) 48%, rgba(0,0,0,0.22));
-  mix-blend-mode:screen;
+    linear-gradient(90deg, rgba(255,255,255,0.08), transparent 38%, rgba(36,52,62,0.08)),
+    linear-gradient(180deg, transparent 0%, rgba(38,48,54,0.1) 100%);
+  mix-blend-mode:normal;
 }
 .container{height:100%}
-#container{background:#030814}
+#container{background:#dbe7ec}
+html.poster-mode #container{
+  resize:none!important;
+}
 .panel{
   position:fixed;
   left:12px;
@@ -81,6 +90,50 @@ body::after{
   border:1px solid rgba(92,168,246,0.38);
   text-shadow:0 0 8px rgba(52,134,230,0.55);
 }
+.poster-caption{
+  display:none;
+}
+html.poster-mode .panel{
+  display:none;
+}
+html.poster-mode .poster-caption{
+  position:fixed;
+  left:46px;
+  top:38px;
+  z-index:44;
+  display:flex;
+  align-items:center;
+  gap:22px;
+  padding:16px 20px 15px;
+  max-width:680px;
+  color:#29241c;
+  background:rgba(246,241,226,0.78);
+  border:1px solid rgba(126,111,86,0.24);
+  border-left:4px solid rgba(239,124,30,0.92);
+  box-shadow:0 18px 42px rgba(65,54,38,0.16);
+  backdrop-filter:blur(7px);
+}
+.poster-title{
+  font-size:28px;
+  line-height:32px;
+  font-weight:600;
+}
+.poster-legend{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding-bottom:3px;
+  color:#4a4133;
+  font-size:15px;
+  line-height:18px;
+}
+.legend-line{
+  display:inline-block;
+  width:54px;
+  height:0;
+  border-top:5px solid #ef7c1e;
+  box-shadow:0 0 0 2px rgba(255,246,226,0.84);
+}
 @media (max-width: 720px){
   .panel{
     left:8px;
@@ -92,6 +145,18 @@ body::after{
   .panel select{
     flex:1 1 auto;
     min-width:118px;
+  }
+}
+@media (max-width: 900px){
+  html.poster-mode .poster-caption{
+    left:24px;
+    top:24px;
+    gap:16px;
+    padding:12px 15px;
+  }
+  .poster-title{
+    font-size:20px;
+    line-height:24px;
   }
 }
 </style>
@@ -114,49 +179,53 @@ body::after{
   <span id="pipelineStats" class="badge">待加载</span>
   <span id="statusText" class="hint">默认按文件自带坐标加载；若位置不对，切换坐标系后重载。</span>
 </div>
+<div class="poster-caption" aria-hidden="true">
+  <div class="poster-title">宽厚里燃气管线总览</div>
+  <div class="poster-legend"><span class="legend-line"></span><span>燃气管线</span></div>
+</div>
 <script language="javascript">
 var DXF_FILE_NAME = '宽厚里.dxf';
 var WGS84 = 'WGS84';
+var POSTER_MODE = window.IS_POSTER_MODE === true;
 var VIEW_PRESET = {
   center: [116.333926, 39.997245],
-  zoom: 17.15,
-  pitch: 64,
-  rotation: -28,
-  fitZoom: 17.35,
-  fitPadding: [112, 84, 78, 78]
+  zoom: 17.1,
+  pitch: 52,
+  rotation: -24,
+  fitZoom: 17.38,
+  fitPadding: [98, 96, 138, 120],
+  mapStyle: 'amap://styles/normal'
 };
 var BUILDING_LAYER_STYLE = {
-  wallColor: 'rgba(0, 44, 145, 0.78)',
-  roofColor: 'rgba(103, 174, 226, 0.9)',
-  focusWallColor: 'rgba(0, 56, 188, 0.82)',
-  focusRoofColor: 'rgba(122, 194, 241, 0.94)',
-  heightFactor: 1.62,
-  opacity: 0.98,
-  focusPaddingRatio: 0.34,
-  minFocusPadding: 0.004
+  wallColor: ['rgba(36, 130, 238, 0.42)', 'rgba(43, 178, 255, 0.12)'],
+  roofColor: 'rgba(72, 172, 255, 0.62)',
+  heightFactor: 1.12,
+  opacity: 0.6,
+  zIndex: 140
 };
 var PIPELINE_STYLE = {
-  baseColor: '#120600',
-  baseOpacity: 0.46,
-  baseWeight: 5,
-  glowColor: '#ffb13c',
-  glowOpacity: 0.34,
-  glowWeight: 3.8,
-  strokeColor: '#ff8a16',
-  strokeOpacity: 0.9,
-  strokeWeight: 2.4,
+  baseColor: '#382112',
+  baseOpacity: 0.72,
+  baseWeight: 8.6,
+  glowColor: '#d47a2b',
+  glowOpacity: 0.2,
+  glowWeight: 6.2,
+  strokeColor: '#ea7a1b',
+  strokeOpacity: 0.96,
+  strokeWeight: 4.2,
   lineJoin: 'miter',
   lineCap: 'butt',
-  zIndexBase: 220,
-  zIndexGlow: 224,
-  zIndexTop: 228
+  zIndexBase: 90,
+  zIndexGlow: 94,
+  zIndexTop: 98
 };
 var VALVE_STYLE = {
-  symbolColor: '#ff8a00',
-  borderColor: '#160700',
-  textColor: '#ffd28b',
-  haloColor: 'rgba(18, 8, 0, 0.92)',
-  zIndex: 240
+  symbolColor: '#ea7a1b',
+  borderColor: '#382112',
+  textColor: '#6e3a12',
+  haloColor: 'rgba(247, 238, 218, 0.86)',
+  zIndex: 240,
+  showLabel: false
 };
 var VALVE_KEYWORDS = ['阀'];
 var SEGMENT_MERGE_TOLERANCE = 0.8;
@@ -196,30 +265,40 @@ function mapInit(){
     viewMode:'3D',
     zooms:[2,20],
     center:VIEW_PRESET.center,
-    showLabel:false,
-    mapStyle:'amap://styles/darkblue'
+    showLabel:true,
+    features:['bg','road','point'],
+    mapStyle:VIEW_PRESET.mapStyle
   });
 
+  configureMapFeatures();
   addCityBuildingLayer();
 
-  var controlBar = new AMap.ControlBar({
-    position:{
-      right:'10px',
-      top:'10px'
-    }
-  });
-  controlBar.addTo(map);
+  if (!POSTER_MODE) {
+    var controlBar = new AMap.ControlBar({
+      position:{
+        right:'10px',
+        top:'10px'
+      }
+    });
+    controlBar.addTo(map);
 
-  var toolBar = new AMap.ToolBar({
-    position:{
-      right:'40px',
-      top:'110px'
-    }
-  });
-  toolBar.addTo(map);
+    var toolBar = new AMap.ToolBar({
+      position:{
+        right:'40px',
+        top:'110px'
+      }
+    });
+    toolBar.addTo(map);
+  }
 
   initPipelineTools();
   loadDefaultDxf();
+}
+
+function configureMapFeatures(){
+  if (typeof map.setFeatures === 'function') {
+    map.setFeatures(['bg', 'road', 'point']);
+  }
 }
 
 function addCityBuildingLayer(){
@@ -229,7 +308,7 @@ function addCityBuildingLayer(){
   }
 
   buildingLayer = new AMap.Buildings({
-    zIndex: 100,
+    zIndex: BUILDING_LAYER_STYLE.zIndex,
     opacity: BUILDING_LAYER_STYLE.opacity,
     zooms: [14, 20],
     heightFactor: BUILDING_LAYER_STYLE.heightFactor,
@@ -237,79 +316,6 @@ function addCityBuildingLayer(){
     roofColor: BUILDING_LAYER_STYLE.roofColor
   });
   map.addLayer(buildingLayer);
-}
-
-function applyBuildingFocusStyle(projected){
-  if (!buildingLayer || typeof buildingLayer.setStyle !== 'function') return;
-
-  var focusPath = createBuildingFocusPath(projected);
-  if (!focusPath) return;
-
-  buildingLayer.setStyle({
-    hideWithoutStyle: false,
-    areas: [{
-      visible: true,
-      rejectTexture: false,
-      color1: BUILDING_LAYER_STYLE.focusRoofColor,
-      color2: BUILDING_LAYER_STYLE.focusWallColor,
-      path: focusPath
-    }]
-  });
-
-  if (typeof buildingLayer.setOpacity === 'function') {
-    buildingLayer.setOpacity(BUILDING_LAYER_STYLE.opacity);
-  }
-}
-
-function createBuildingFocusPath(projected){
-  var bounds = getProjectedBounds(projected);
-  if (!bounds) return null;
-
-  var width = bounds.maxLng - bounds.minLng;
-  var height = bounds.maxLat - bounds.minLat;
-  var lngPad = Math.max(width * BUILDING_LAYER_STYLE.focusPaddingRatio, BUILDING_LAYER_STYLE.minFocusPadding);
-  var latPad = Math.max(height * BUILDING_LAYER_STYLE.focusPaddingRatio, BUILDING_LAYER_STYLE.minFocusPadding);
-
-  return [
-    [bounds.minLng - lngPad, bounds.minLat - latPad],
-    [bounds.maxLng + lngPad, bounds.minLat - latPad],
-    [bounds.maxLng + lngPad, bounds.maxLat + latPad],
-    [bounds.minLng - lngPad, bounds.maxLat + latPad],
-    [bounds.minLng - lngPad, bounds.minLat - latPad]
-  ];
-}
-
-function getProjectedBounds(projected){
-  var bounds = null;
-
-  projected.features.forEach(function(feature){
-    feature.path.forEach(function(lnglat){
-      bounds = extendLngLatBounds(bounds, lnglat);
-    });
-  });
-
-  projected.valves.forEach(function(valve){
-    bounds = extendLngLatBounds(bounds, valve.lnglat);
-  });
-
-  return bounds;
-}
-
-function extendLngLatBounds(bounds, lnglat){
-  if (!lnglat || !Number.isFinite(lnglat[0]) || !Number.isFinite(lnglat[1])) return bounds;
-  if (!bounds) {
-    return {
-      minLng: lnglat[0],
-      maxLng: lnglat[0],
-      minLat: lnglat[1],
-      maxLat: lnglat[1]
-    };
-  }
-  bounds.minLng = Math.min(bounds.minLng, lnglat[0]);
-  bounds.maxLng = Math.max(bounds.maxLng, lnglat[0]);
-  bounds.minLat = Math.min(bounds.minLat, lnglat[1]);
-  bounds.maxLat = Math.max(bounds.maxLat, lnglat[1]);
-  return bounds;
 }
 
 function registerProjectionDefs(){
@@ -412,7 +418,6 @@ function renderDxfText(dxfText, projectionId){
   }
 
   drawProjectedFeatures(projected);
-  applyBuildingFocusStyle(projected);
   document.getElementById('fitPipelineBtn').disabled = false;
   fitPipelineView();
   setStats(projected.features.length + ' 条管线 / ' + projected.valves.length + ' 个阀门');
@@ -813,7 +818,9 @@ function drawProjectedFeatures(projected){
 
   projected.valves.forEach(function(valve){
     overlays.push(createValveSymbol(valve));
-    overlays.push(createValveLabel(valve));
+    if (VALVE_STYLE.showLabel) {
+      overlays.push(createValveLabel(valve));
+    }
   });
 
   dxfOverlays = overlays;
