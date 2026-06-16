@@ -222,13 +222,7 @@ var VIEW_PRESET = {
   fitPadding: [98, 96, 138, 120],
   mapStyle: 'amap://styles/normal'
 };
-var BUILDING_LAYER_STYLE = {
-  wallColor: 'rgba(34, 126, 232, 0.44)',
-  roofColor: 'rgba(94, 184, 255, 0.5)',
-  heightFactor: 1.12,
-  opacity: 0.68,
-  zIndex: 140
-};
+var SATELLITE_LAYER_ZINDEX = 1;
 var PIPELINE_STYLE = {
   baseColor: '#382112',
   baseOpacity: 0.72,
@@ -277,7 +271,7 @@ var CRS_DEFS = {
   }
 };
 var map;
-var buildingLayer;
+var satelliteLayer;
 var dxfOverlays = [];
 var currentDxfText = '';
 var currentProjectionId = 'cgcs2000-gk-117';
@@ -296,11 +290,12 @@ function mapInit(){
     zooms:[2,20],
     center:INITIAL_VIEW.center,
     showLabel:true,
-    showBuildingBlock:false,
+    showBuildingBlock:true,
+    features:['road', 'point', 'building'],
     mapStyle:VIEW_PRESET.mapStyle
   });
 
-  addCityBuildingLayer();
+  addSatelliteImageryLayer();
 
   if (!POSTER_MODE) {
     var controlBar = new AMap.ControlBar({
@@ -323,6 +318,14 @@ function mapInit(){
   initPipelineTools();
   initExportHotkeys();
   loadDefaultDxf();
+}
+
+function addSatelliteImageryLayer(){
+  if (!AMap.TileLayer || !AMap.TileLayer.Satellite) return;
+  satelliteLayer = new AMap.TileLayer.Satellite({
+    zIndex: SATELLITE_LAYER_ZINDEX
+  });
+  map.addLayer(satelliteLayer);
 }
 
 function readViewFromUrl(){
@@ -404,23 +407,6 @@ function updateUrlWithCurrentView(view){
   params.set('pitch', String(view.pitch));
   params.set('rotation', String(view.rotation));
   history.replaceState(null, '', window.location.pathname + '?' + params.toString());
-}
-
-function addCityBuildingLayer(){
-  if (!AMap.Buildings) {
-    console.warn('AMap.Buildings is not available in the current JSAPI runtime.');
-    return;
-  }
-
-  buildingLayer = new AMap.Buildings({
-    zIndex: BUILDING_LAYER_STYLE.zIndex,
-    opacity: BUILDING_LAYER_STYLE.opacity,
-    zooms: [14, 20],
-    heightFactor: BUILDING_LAYER_STYLE.heightFactor,
-    wallColor: BUILDING_LAYER_STYLE.wallColor,
-    roofColor: BUILDING_LAYER_STYLE.roofColor
-  });
-  map.addLayer(buildingLayer);
 }
 
 function registerProjectionDefs(){
