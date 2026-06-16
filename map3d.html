@@ -103,7 +103,7 @@ html.poster-mode .poster-caption{
   z-index:44;
   display:flex;
   align-items:center;
-  gap:22px;
+  gap:20px;
   padding:16px 20px 15px;
   max-width:680px;
   color:#29241c;
@@ -121,11 +121,17 @@ html.poster-mode .poster-caption{
 .poster-legend{
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:18px;
   padding-bottom:3px;
   color:#4a4133;
   font-size:15px;
   line-height:18px;
+}
+.legend-item{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  white-space:nowrap;
 }
 .legend-line{
   display:inline-block;
@@ -133,6 +139,11 @@ html.poster-mode .poster-caption{
   height:0;
   border-top:5px solid #ef7c1e;
   box-shadow:0 0 0 2px rgba(255,246,226,0.84);
+}
+.legend-valve{
+  width:22px;
+  height:28px;
+  display:inline-block;
 }
 @media (max-width: 720px){
   .panel{
@@ -181,7 +192,22 @@ html.poster-mode .poster-caption{
 </div>
 <div class="poster-caption" aria-hidden="true">
   <div class="poster-title">宽厚里燃气管线总览</div>
-  <div class="poster-legend"><span class="legend-line"></span><span>燃气管线</span></div>
+  <div class="poster-legend">
+    <span class="legend-item"><span class="legend-line"></span><span>燃气管线</span></span>
+    <span class="legend-item">
+      <svg class="legend-valve" viewBox="0 0 38 52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M19 50 L14.5 38 H23.5 Z" fill="#382112" opacity="0.82"/>
+        <path d="M19 42 V30" stroke="rgba(56,33,18,0.72)" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="19" cy="20" r="16" fill="#ea7a1b" stroke="#382112" stroke-width="2"/>
+        <circle cx="19" cy="20" r="12" fill="rgba(255,246,226,0.18)" stroke="rgba(255,255,255,0.72)" stroke-width="1"/>
+        <path d="M9.5 13.5 L18.4 20 L9.5 26.5 Z" fill="#fff7e4" stroke="#382112" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M28.5 13.5 L19.6 20 L28.5 26.5 Z" fill="#fff7e4" stroke="#382112" stroke-width="1.4" stroke-linejoin="round"/>
+        <circle cx="19" cy="20" r="2.6" fill="#ffcf7a" stroke="#382112" stroke-width="1.2"/>
+        <path d="M19 11.2 V28.8" stroke="#382112" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>阀门</span>
+    </span>
+  </div>
 </div>
 <script language="javascript">
 var DXF_FILE_NAME = '宽厚里.dxf';
@@ -197,10 +223,10 @@ var VIEW_PRESET = {
   mapStyle: 'amap://styles/normal'
 };
 var BUILDING_LAYER_STYLE = {
-  wallColor: ['rgba(36, 130, 238, 0.42)', 'rgba(43, 178, 255, 0.12)'],
-  roofColor: 'rgba(72, 172, 255, 0.62)',
+  wallColor: 'rgba(34, 126, 232, 0.44)',
+  roofColor: 'rgba(94, 184, 255, 0.5)',
   heightFactor: 1.12,
-  opacity: 0.6,
+  opacity: 0.68,
   zIndex: 140
 };
 var PIPELINE_STYLE = {
@@ -222,12 +248,15 @@ var PIPELINE_STYLE = {
 var VALVE_STYLE = {
   symbolColor: '#ea7a1b',
   borderColor: '#382112',
+  accentColor: '#ffcf7a',
+  poleColor: 'rgba(56, 33, 18, 0.72)',
   textColor: '#6e3a12',
   haloColor: 'rgba(247, 238, 218, 0.86)',
   zIndex: 240,
   showLabel: false
 };
-var VALVE_KEYWORDS = ['阀'];
+var VALVE_KEYWORDS = ['阀门', '阀'];
+var DXF_TEXT_ENCODINGS = ['gb18030', 'gbk', 'utf-8'];
 var SEGMENT_MERGE_TOLERANCE = 0.8;
 var CRS_DEFS = {
   'cgcs2000-gk-117': {
@@ -368,7 +397,7 @@ async function loadDefaultDxf(){
     if (!response.ok) {
       throw new Error('HTTP ' + response.status);
     }
-    currentDxfText = await response.text();
+    currentDxfText = decodeDxfBuffer(await response.arrayBuffer());
     renderDxfText(currentDxfText, currentProjectionId);
   } catch (error) {
     console.warn(error);
@@ -379,18 +408,39 @@ async function loadDefaultDxf(){
   }
 }
 
+function decodeDxfBuffer(buffer){
+  if (!window.TextDecoder) {
+    return '';
+  }
+
+  for (var i = 0; i < DXF_TEXT_ENCODINGS.length; i += 1) {
+    try {
+      var text = new TextDecoder(DXF_TEXT_ENCODINGS[i]).decode(buffer);
+      if (isReadableDxfText(text)) return text;
+    } catch (error) {
+      // Try the next browser-supported encoding.
+    }
+  }
+
+  return new TextDecoder().decode(buffer);
+}
+
+function isReadableDxfText(text){
+  return text.indexOf('SECTION') !== -1 && text.indexOf('ENTITIES') !== -1;
+}
+
 function readLocalDxfFile(file){
   setStatus('正在读取本地 DXF: ' + file.name);
   var reader = new FileReader();
   reader.onload = function(){
-    currentDxfText = String(reader.result || '');
+    currentDxfText = decodeDxfBuffer(reader.result);
     renderDxfText(currentDxfText, currentProjectionId);
   };
   reader.onerror = function(){
     console.warn(reader.error);
     setStatus('读取本地 DXF 失败，请重试');
   };
-  reader.readAsText(file, 'gbk');
+  reader.readAsArrayBuffer(file);
 }
 
 function renderDxfText(dxfText, projectionId){
@@ -832,17 +882,37 @@ function createValveSymbol(valve){
   return new AMap.Marker({
     position: valve.lnglat,
     zIndex: VALVE_STYLE.zIndex,
-    offset: new AMap.Pixel(-8, -8),
-    angle: rotation,
-    content:
-      '<div style="' +
-      'width:14px;height:14px;box-sizing:border-box;' +
-      'border:2px solid ' + VALVE_STYLE.borderColor + ';' +
-      'background:radial-gradient(circle at 38% 34%, #ffd37a 0, ' + VALVE_STYLE.symbolColor + ' 58%, #b54400 100%);' +
-      'transform:rotate(45deg);' +
-      'box-shadow:0 0 0 1px rgba(20,16,8,0.38),0 0 12px rgba(255,122,0,0.86);' +
-      '"></div>'
+    offset: new AMap.Pixel(-19, -52),
+    title: valve.name || '阀门',
+    content: createValveSvg(rotation)
   });
+}
+
+function createValveSvg(rotation){
+  var symbolRotation = Number.isFinite(rotation) ? rotation : 0;
+  return [
+    '<div style="width:38px;height:52px;transform:translateY(-2px);">',
+      '<svg width="38" height="52" viewBox="0 0 38 52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">',
+        '<defs>',
+          '<filter id="valveShadow" x="-40%" y="-30%" width="180%" height="180%">',
+            '<feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="rgba(35,21,9,0.42)"/>',
+          '</filter>',
+        '</defs>',
+        '<g filter="url(#valveShadow)">',
+          '<path d="M19 50 L14.5 38 H23.5 Z" fill="' + VALVE_STYLE.borderColor + '" opacity="0.82"/>',
+          '<path d="M19 42 V30" stroke="' + VALVE_STYLE.poleColor + '" stroke-width="3" stroke-linecap="round"/>',
+          '<circle cx="19" cy="20" r="16" fill="' + VALVE_STYLE.symbolColor + '" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="2"/>',
+          '<circle cx="19" cy="20" r="12" fill="rgba(255,246,226,0.18)" stroke="rgba(255,255,255,0.72)" stroke-width="1"/>',
+          '<g transform="rotate(' + symbolRotation + ' 19 20)">',
+            '<path d="M9.5 13.5 L18.4 20 L9.5 26.5 Z" fill="#fff7e4" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.4" stroke-linejoin="round"/>',
+            '<path d="M28.5 13.5 L19.6 20 L28.5 26.5 Z" fill="#fff7e4" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.4" stroke-linejoin="round"/>',
+            '<circle cx="19" cy="20" r="2.6" fill="' + VALVE_STYLE.accentColor + '" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.2"/>',
+            '<path d="M19 11.2 V28.8" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.4" stroke-linecap="round"/>',
+          '</g>',
+        '</g>',
+      '</svg>',
+    '</div>'
+  ].join('');
 }
 
 function createValveLabel(valve){
