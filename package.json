@@ -2,7 +2,8 @@
   "name": "gaode-poster-map",
   "private": true,
   "scripts": {
-    "export:poster": "node scripts/export-poster.js"
+    "export:poster": "node scripts/export-poster.js",
+    "serve": "node scripts/export-server.js"
   },
   "devDependencies": {
     "playwright": "^1.61.0"

@@ -281,6 +281,7 @@ var buildingLayer;
 var dxfOverlays = [];
 var currentDxfText = '';
 var currentProjectionId = 'cgcs2000-gk-117';
+var INITIAL_VIEW = readViewFromUrl();
 
 function mapInit(){
   registerProjectionDefs();
@@ -288,18 +289,17 @@ function mapInit(){
   map = new AMap.Map('container', {
     rotateEnable:true,
     pitchEnable:true,
-    zoom:VIEW_PRESET.zoom,
-    pitch:VIEW_PRESET.pitch,
-    rotation:VIEW_PRESET.rotation,
+    zoom:INITIAL_VIEW.zoom,
+    pitch:INITIAL_VIEW.pitch,
+    rotation:INITIAL_VIEW.rotation,
     viewMode:'3D',
     zooms:[2,20],
-    center:VIEW_PRESET.center,
+    center:INITIAL_VIEW.center,
     showLabel:true,
-    features:['bg','road','point'],
+    showBuildingBlock:false,
     mapStyle:VIEW_PRESET.mapStyle
   });
 
-  configureMapFeatures();
   addCityBuildingLayer();
 
   if (!POSTER_MODE) {
@@ -321,13 +321,89 @@ function mapInit(){
   }
 
   initPipelineTools();
+  initExportHotkeys();
   loadDefaultDxf();
 }
 
-function configureMapFeatures(){
-  if (typeof map.setFeatures === 'function') {
-    map.setFeatures(['bg', 'road', 'point']);
+function readViewFromUrl(){
+  var params = new URLSearchParams(window.location.search);
+  var centerParam = params.get('center');
+  var center = VIEW_PRESET.center;
+  if (centerParam) {
+    var parts = centerParam.split(',').map(Number);
+    if (parts.length === 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+      center = [parts[0], parts[1]];
+    }
   }
+
+  return {
+    center: center,
+    zoom: readNumberParam(params, 'zoom', VIEW_PRESET.zoom),
+    pitch: readNumberParam(params, 'pitch', VIEW_PRESET.pitch),
+    rotation: readNumberParam(params, 'rotation', VIEW_PRESET.rotation)
+  };
+}
+
+function readNumberParam(params, name, fallback){
+  var value = Number(params.get(name));
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function initExportHotkeys(){
+  document.addEventListener('keydown', function(event){
+    if (!(event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'e')) return;
+    event.preventDefault();
+    exportCurrentPosterView();
+  });
+}
+
+async function exportCurrentPosterView(){
+  if (!map) return;
+  var view = getCurrentMapView();
+  setStatus('正在导出当前视角高清图，请稍候...');
+  try {
+    var response = await fetch('/api/export-current-view', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        view: view,
+        width: 3000,
+        height: 1688,
+        scale: 4,
+        settle: 60000,
+        wait: 90000
+      })
+    });
+    var result = await response.json();
+    if (!response.ok || !result.ok) {
+      throw new Error(result.error || '导出失败');
+    }
+    setStatus('已导出高清图: ' + result.file);
+  } catch (error) {
+    console.warn(error);
+    setStatus('快捷键导出需要先运行 npm run serve。当前视角已写入地址参数，可用导出命令手动导出。');
+    updateUrlWithCurrentView(view);
+  }
+}
+
+function getCurrentMapView(){
+  var center = map.getCenter();
+  return {
+    center: [center.lng, center.lat],
+    zoom: typeof map.getZoom === 'function' ? map.getZoom() : VIEW_PRESET.zoom,
+    pitch: typeof map.getPitch === 'function' ? map.getPitch() : VIEW_PRESET.pitch,
+    rotation: typeof map.getRotation === 'function' ? map.getRotation() : VIEW_PRESET.rotation
+  };
+}
+
+function updateUrlWithCurrentView(view){
+  var params = new URLSearchParams(window.location.search);
+  if (POSTER_MODE) params.set('poster', '1');
+  params.set('center', view.center[0].toFixed(8) + ',' + view.center[1].toFixed(8));
+  params.set('zoom', String(view.zoom));
+  params.set('pitch', String(view.pitch));
+  params.set('rotation', String(view.rotation));
+  history.replaceState(null, '', window.location.pathname + '?' + params.toString());
 }
 
 function addCityBuildingLayer(){
@@ -941,12 +1017,18 @@ function clearDxfOverlays(){
 
 function fitPipelineView(){
   if (!dxfOverlays.length) return;
+  if (hasViewParamsInUrl()) return;
   map.setFitView(dxfOverlays, false, VIEW_PRESET.fitPadding);
   window.setTimeout(function(){
     if (typeof map.setZoom === 'function') map.setZoom(VIEW_PRESET.fitZoom);
     if (typeof map.setPitch === 'function') map.setPitch(VIEW_PRESET.pitch);
     if (typeof map.setRotation === 'function') map.setRotation(VIEW_PRESET.rotation);
   }, 220);
+}
+
+function hasViewParamsInUrl(){
+  var params = new URLSearchParams(window.location.search);
+  return params.has('center') || params.has('zoom') || params.has('pitch') || params.has('rotation');
 }
 
 function setStats(message){

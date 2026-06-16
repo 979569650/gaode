@@ -22,8 +22,8 @@ function parseArgs(argv) {
     width: 1920,
     height: 1080,
     scale: 4,
-    wait: 45000,
-    settle: 15000,
+    wait: 90000,
+    settle: 60000,
     output: DEFAULT_OUTPUT,
     path: '/map3d.html?poster=1',
     headed: false
@@ -100,23 +100,34 @@ async function main() {
       deviceScaleFactor: options.scale
     });
     const page = await context.newPage();
+    page.setDefaultTimeout(options.wait);
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: options.wait });
-    await page.waitForFunction(() => {
-      const status = document.getElementById('statusText');
-      return status && status.textContent.indexOf('已加载') !== -1;
-    }, { timeout: options.wait });
+    await waitForPosterReady(page, options.wait, options.settle);
 
-    if (options.settle > 0) {
-      await page.waitForTimeout(options.settle);
-    }
-
-    await page.screenshot({ path: options.output, fullPage: false });
+    await page.screenshot({ path: options.output, fullPage: false, timeout: Math.max(options.wait, 180000) });
     console.log(`Exported ${options.output}`);
     console.log(`Image pixels: ${options.width * options.scale} x ${options.height * options.scale}`);
   } finally {
     await browser.close();
     server.close();
+  }
+}
+
+async function waitForPosterReady(page, wait, settle) {
+  await page.waitForFunction(() => {
+    const status = document.getElementById('statusText');
+    return status && status.textContent.indexOf('已加载') !== -1;
+  }, { timeout: wait });
+
+  try {
+    await page.waitForLoadState('networkidle', { timeout: Math.min(wait, 60000) });
+  } catch (error) {
+    // AMap can keep background tile requests open; the settle wait below gives labels time to finish.
+  }
+
+  if (settle > 0) {
+    await page.waitForTimeout(settle);
   }
 }
 
