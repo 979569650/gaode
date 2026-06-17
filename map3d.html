@@ -226,9 +226,11 @@ var VIEW_PRESET = {
   fitPadding: [98, 96, 138, 120],
   mapStyle: 'amap://styles/normal'
 };
-var SATELLITE_LAYER_ZINDEX = 1;
-var ROAD_NET_LAYER_ZINDEX = 1;
-var BUILDINGS_LAYER_ZINDEX = 10;
+var SATELLITE_LAYER_ZINDEX = 10;
+var ROAD_NET_LAYER_ZINDEX = 20;
+var PIPELINE_LAYER_ZINDEX = 100;
+var MODEL_LAYER_ZINDEX = 160;
+var LABEL_LAYER_ZINDEX = 240;
 var PIPELINE_STYLE = {
   baseColor: '#382112',
   baseOpacity: 0.72,
@@ -241,9 +243,9 @@ var PIPELINE_STYLE = {
   strokeWeight: 4.2,
   lineJoin: 'miter',
   lineCap: 'butt',
-  zIndexBase: 90,
-  zIndexGlow: 94,
-  zIndexTop: 98
+  zIndexBase: PIPELINE_LAYER_ZINDEX,
+  zIndexGlow: PIPELINE_LAYER_ZINDEX + 4,
+  zIndexTop: PIPELINE_LAYER_ZINDEX + 8
 };
 var PIPELINE_3D_STYLE = {
   radius: 0.38,
@@ -266,7 +268,7 @@ var PIPELINE_3D_STYLE = {
   undergroundOpacity: 0.46,
   verticalPlanarTolerance: 0.25,
   verticalHeightTolerance: 0.1,
-  zIndex: 120
+  zIndex: PIPELINE_LAYER_ZINDEX
 };
 var VALVE_STYLE = {
   symbolColor: '#ea7a1b',
@@ -278,7 +280,7 @@ var VALVE_STYLE = {
   width: 32,
   height: 44,
   dedupePixelDistance: 28,
-  zIndex: 240,
+  zIndex: LABEL_LAYER_ZINDEX,
   showLabel: false
 };
 var VALVE_KEYWORDS = ['阀门', '阀'];
@@ -383,16 +385,16 @@ function addBuildingsLayer(){
   // 这里的构造参数控制整个图层，后面的 setStyle 再覆盖项目范围内的样式。
   if (!AMap.Buildings) return;
   buildingsLayer = new AMap.Buildings({
-    // 让楼块位于自定义 Three 管线图层之下，但在底图影像/道路之上。
-    zIndex: BUILDINGS_LAYER_ZINDEX,
+    // 模型层放在管线层之上、文字标注层之下。
+    zIndex: MODEL_LAYER_ZINDEX,
     // 高德楼块在近距离缩放级别下才有意义。
     zooms: [16, 20],
     // 1 表示使用官方楼高；只有需要夸张天际线时才调大。
     heightFactor: 1,
     // 这些颜色是全局兜底；项目范围内的主要样式由下面的 setStyle 控制。
     opacity: 1,
-    wallColor: 'rgba(96, 116, 132, 0.85)',
-    roofColor: 'rgba(232, 238, 242, 0.85)'
+    wallColor: 'rgba(96, 116, 132, 0.65)',
+    roofColor: 'rgba(232, 238, 242, 0.65)'
   });
   map.addLayer(buildingsLayer);
 }
@@ -412,8 +414,8 @@ function updateBuildingsLayerStyle(projected){
     hideWithoutStyle: false,
     areas: [{
       // AMap Buildings 中 color1 通常用于楼顶/上表面，color2 用于墙面/侧面。
-      color1: 'rgba(232, 238, 242, 0.85)',
-      color2: 'rgba(96, 116, 132, 0.85)',
+      color1: 'rgba(232, 238, 242, 0.65)',
+      color2: 'rgba(96, 116, 132, 0.65)',
       // 覆盖当前 DXF 管线范围及其缓冲区的矩形。
       path: [
         [minLng, minLat],
