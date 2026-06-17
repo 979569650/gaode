@@ -117,7 +117,7 @@ async function main() {
 async function waitForPosterReady(page, wait, settle) {
   await page.waitForFunction(() => {
     const status = document.getElementById('statusText');
-    return status && status.textContent.indexOf('已加载') !== -1;
+    return status && status.textContent.indexOf('已加载') !== -1 && window.__PIPELINE_3D_READY !== false;
   }, { timeout: wait });
 
   try {

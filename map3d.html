@@ -172,6 +172,10 @@ html.poster-mode .poster-caption{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.9.2/dist/proj4.js"></script>
+<script>
+window.__THREE_LOAD_FAILED = false;
+</script>
+<script src="/node_modules/three/build/three.min.js" onerror="window.__THREE_LOAD_FAILED = true;"></script>
 <script language="javascript" src="https://webapi.amap.com/maps?v=2.0&key=86b38afc099831c3350c486dd1ff1c98&plugin=AMap.ControlBar,AMap.ToolBar"></script>
 </head>
 <body>
@@ -216,7 +220,7 @@ var POSTER_MODE = window.IS_POSTER_MODE === true;
 var VIEW_PRESET = {
   center: [116.333926, 39.997245],
   zoom: 17.1,
-  pitch: 52,
+  pitch: 64,
   rotation: -24,
   fitZoom: 17.38,
   fitPadding: [98, 96, 138, 120],
@@ -239,6 +243,25 @@ var PIPELINE_STYLE = {
   zIndexGlow: 94,
   zIndexTop: 98
 };
+var PIPELINE_3D_STYLE = {
+  radius: 0.38,
+  verticalRadius: 0.55,
+  radialSegments: 12,
+  color: 0xff9f1c,
+  verticalColor: 0xfff06a,
+  verticalHaloColor: 0xfff4a8,
+  emissive: 0x7a2c00,
+  verticalEmissive: 0x8a5600,
+  roughness: 0.42,
+  metalness: 0.08,
+  baseHeight: 3,
+  heightScale: 1,
+  jointRadius: 0.58,
+  verticalHaloRadius: 1.05,
+  verticalPlanarTolerance: 0.25,
+  verticalHeightTolerance: 0.1,
+  zIndex: 120
+};
 var VALVE_STYLE = {
   symbolColor: '#ea7a1b',
   borderColor: '#382112',
@@ -246,6 +269,9 @@ var VALVE_STYLE = {
   poleColor: 'rgba(56, 33, 18, 0.72)',
   textColor: '#6e3a12',
   haloColor: 'rgba(247, 238, 218, 0.86)',
+  width: 32,
+  height: 44,
+  dedupePixelDistance: 28,
   zIndex: 240,
   showLabel: false
 };
@@ -273,9 +299,14 @@ var CRS_DEFS = {
 var map;
 var satelliteLayer;
 var dxfOverlays = [];
+var dxfValveOverlays = [];
+var dxfThreeLayer = null;
+var dxfThreeState = null;
+var currentProjected = null;
 var currentDxfText = '';
 var currentProjectionId = 'cgcs2000-gk-117';
 var INITIAL_VIEW = readViewFromUrl();
+window.__PIPELINE_3D_READY = false;
 
 function mapInit(){
   registerProjectionDefs();
@@ -316,6 +347,7 @@ function mapInit(){
   }
 
   initPipelineTools();
+  initValveRefreshEvents();
   initExportHotkeys();
   loadDefaultDxf();
 }
@@ -529,11 +561,11 @@ function renderDxfText(dxfText, projectionId){
     return;
   }
 
-  drawProjectedFeatures(projected);
   document.getElementById('fitPipelineBtn').disabled = false;
+  setStats(formatProjectedStats(projected));
+  setStatus('正在渲染三维管线，坐标系: ' + projection.label + ' ...');
+  drawProjectedFeatures(projected, projection.label);
   fitPipelineView();
-  setStats(projected.features.length + ' 条管线 / ' + projected.valves.length + ' 个阀门');
-  setStatus('已加载 ' + projected.features.length + ' 条管线、' + projected.valves.length + ' 个阀门，坐标系: ' + projection.label);
 }
 
 function parseDxf(dxfText){
@@ -648,6 +680,7 @@ function consumeVertexEntity(pairs, startIndex){
   var point = null;
   var x = null;
   var y = null;
+  var z = 0;
   var cursor = startIndex;
 
   while (cursor < pairs.length) {
@@ -655,11 +688,12 @@ function consumeVertexEntity(pairs, startIndex){
     if (pair.code === '0') break;
     if (pair.code === '10') x = toNumber(pair.value);
     if (pair.code === '20') y = toNumber(pair.value);
+    if (pair.code === '30') z = toNumber(pair.value);
     cursor += 1;
   }
 
   if (Number.isFinite(x) && Number.isFinite(y)) {
-    point = [x, y];
+    point = makePoint(x, y, z);
   }
 
   return {
@@ -672,8 +706,8 @@ function pushFeatureFromEntity(features, inserts, entity){
   var type = entity.type;
   if (type === 'LINE' || type === 'TRLINE') {
     var linePoints = [
-      [firstNumber(entity.data['10']), firstNumber(entity.data['20'])],
-      [firstNumber(entity.data['11']), firstNumber(entity.data['21'])]
+      makePoint(firstNumber(entity.data['10']), firstNumber(entity.data['20']), firstNumber(entity.data['30'])),
+      makePoint(firstNumber(entity.data['11']), firstNumber(entity.data['21']), firstNumber(entity.data['31']))
     ];
     if (isValidPoint(linePoints[0]) && isValidPoint(linePoints[1])) {
       features.push(makeFeature(firstValue(entity.data['8']), linePoints, type));
@@ -682,7 +716,7 @@ function pushFeatureFromEntity(features, inserts, entity){
   }
 
   if (type === 'INSERT') {
-    var insertPoint = [firstNumber(entity.data['10']), firstNumber(entity.data['20'])];
+    var insertPoint = makePoint(firstNumber(entity.data['10']), firstNumber(entity.data['20']), firstNumber(entity.data['30']));
     if (isValidPoint(insertPoint)) {
       inserts.push({
         layer: firstValue(entity.data['8']) || '0',
@@ -698,8 +732,10 @@ function pushFeatureFromEntity(features, inserts, entity){
     var xs = entity.data['10'] || [];
     var ys = entity.data['20'] || [];
     var points = [];
+    var elevation = firstNumber(entity.data['38']);
+    var z = Number.isFinite(elevation) ? elevation : 0;
     for (var i = 0; i < Math.min(xs.length, ys.length); i += 1) {
-      var point = [toNumber(xs[i]), toNumber(ys[i])];
+      var point = makePoint(toNumber(xs[i]), toNumber(ys[i]), z);
       if (isValidPoint(point)) {
         points.push(point);
       }
@@ -727,15 +763,15 @@ function isClosedPath(points){
   if (!points || points.length < 3) return false;
   var first = points[0];
   var last = points[points.length - 1];
-  return first[0] === last[0] && first[1] === last[1];
+  return first[0] === last[0] && first[1] === last[1] && normalizeZ(first[2]) === normalizeZ(last[2]);
 }
 
 function closePoints(points){
   var first = points[0];
   var last = points[points.length - 1];
   if (!first || !last) return;
-  if (first[0] !== last[0] || first[1] !== last[1]) {
-    points.push([first[0], first[1]]);
+  if (first[0] !== last[0] || first[1] !== last[1] || normalizeZ(first[2]) !== normalizeZ(last[2])) {
+    points.push(makePoint(first[0], first[1], first[2]));
   }
 }
 
@@ -783,7 +819,7 @@ function cloneFeature(feature){
     layer: feature.layer,
     type: feature.type,
     closed: feature.closed,
-    points: feature.points.map(function(point){ return [point[0], point[1]]; })
+    points: feature.points.map(function(point){ return makePoint(point[0], point[1], point[2]); })
   };
 }
 
@@ -825,22 +861,52 @@ function pointsNear(a, b, tolerance){
   if (!a || !b) return false;
   var dx = a[0] - b[0];
   var dy = a[1] - b[1];
-  return Math.sqrt(dx * dx + dy * dy) <= tolerance;
+  var dz = normalizeZ(a[2]) - normalizeZ(b[2]);
+  return Math.sqrt(dx * dx + dy * dy + dz * dz) <= tolerance;
 }
 
 function projectFeatures(features, inserts, projectionId){
   var projectedFeatures = [];
   var projectedValves = [];
+  var minZ = Infinity;
+  var maxZ = -Infinity;
+  var verticalSegments = 0;
+  var bounds = {
+    minLng: Infinity,
+    minLat: Infinity,
+    maxLng: -Infinity,
+    maxLat: -Infinity
+  };
 
   features.forEach(function(feature){
     var path = [];
     feature.points.forEach(function(point){
+      var z = normalizeZ(point[2]);
       var lnglat = projectedPointToGcj(point, projectionId);
       if (!lnglat) return;
-      path.push(lnglat);
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
+      bounds.minLng = Math.min(bounds.minLng, lnglat[0]);
+      bounds.minLat = Math.min(bounds.minLat, lnglat[1]);
+      bounds.maxLng = Math.max(bounds.maxLng, lnglat[0]);
+      bounds.maxLat = Math.max(bounds.maxLat, lnglat[1]);
+      path.push({
+        lng: lnglat[0],
+        lat: lnglat[1],
+        x: point[0],
+        y: point[1],
+        z: z,
+        actualHeight: 0,
+        height: 0
+      });
     });
 
     if (path.length >= 2) {
+      for (var i = 1; i < path.length; i += 1) {
+        if (isVerticalSegment(path[i - 1], path[i])) {
+          verticalSegments += 1;
+        }
+      }
       projectedFeatures.push({
         layer: feature.layer,
         type: feature.type,
@@ -851,19 +917,44 @@ function projectFeatures(features, inserts, projectionId){
 
   inserts.forEach(function(insert){
     if (!isValveInsert(insert)) return;
+    var z = normalizeZ(insert.point[2]);
     var lnglat = projectedPointToGcj(insert.point, projectionId);
     if (!lnglat) return;
+    minZ = Math.min(minZ, z);
+    maxZ = Math.max(maxZ, z);
     projectedValves.push({
       layer: insert.layer,
       name: insert.name,
       rotation: insert.rotation,
-      lnglat: lnglat
+      lnglat: lnglat,
+      z: z
     });
+  });
+
+  if (!Number.isFinite(minZ)) minZ = 0;
+  if (!Number.isFinite(maxZ)) maxZ = minZ;
+  projectedFeatures.forEach(function(feature){
+    feature.path.forEach(function(point){
+      point.actualHeight = point.z - minZ;
+      point.height = PIPELINE_3D_STYLE.baseHeight + point.actualHeight * PIPELINE_3D_STYLE.heightScale;
+    });
+  });
+  projectedValves.forEach(function(valve){
+    valve.actualHeight = valve.z - minZ;
+    valve.height = PIPELINE_3D_STYLE.baseHeight + valve.actualHeight * PIPELINE_3D_STYLE.heightScale;
   });
 
   return {
     features: projectedFeatures,
-    valves: projectedValves
+    valves: projectedValves,
+    visibleValveCount: projectedValves.length,
+    zRange: {
+      min: minZ,
+      max: maxZ,
+      delta: maxZ - minZ
+    },
+    verticalSegments: verticalSegments,
+    bounds: Number.isFinite(bounds.minLng) ? bounds : null
   };
 }
 
@@ -875,7 +966,7 @@ function isValveInsert(insert){
 
 function projectedPointToGcj(point, projectionId){
   try {
-    var wgs84 = proj4(projectionId, WGS84, point);
+    var wgs84 = proj4(projectionId, WGS84, [point[0], point[1]]);
     if (!Array.isArray(wgs84) || wgs84.length < 2) return null;
     if (!isProbablyChinaLngLat(wgs84[0], wgs84[1])) return null;
     return wgs84ToGcj02(wgs84[0], wgs84[1]);
@@ -889,54 +980,315 @@ function isProbablyChinaLngLat(lng, lat){
   return lng >= 70 && lng <= 140 && lat >= 3 && lat <= 55;
 }
 
-function drawProjectedFeatures(projected){
+function drawProjectedFeatures(projected, projectionLabel){
   clearDxfOverlays();
+  window.__PIPELINE_3D_READY = false;
+  currentProjected = projected;
 
-  var overlays = [];
+  var fitOverlays = [];
   projected.features.forEach(function(feature){
-    overlays.push(new AMap.Polyline({
-      path: feature.path,
-      strokeColor: PIPELINE_STYLE.baseColor,
-      strokeOpacity: PIPELINE_STYLE.baseOpacity,
-      strokeWeight: PIPELINE_STYLE.baseWeight,
+    fitOverlays.push(new AMap.Polyline({
+      path: feature.path.map(pointToLngLat),
+      strokeColor: PIPELINE_STYLE.strokeColor,
+      strokeOpacity: 0,
+      strokeWeight: 1,
       strokeStyle: 'solid',
       lineJoin: PIPELINE_STYLE.lineJoin,
       lineCap: PIPELINE_STYLE.lineCap,
       zIndex: PIPELINE_STYLE.zIndexBase
     }));
-
-    overlays.push(new AMap.Polyline({
-      path: feature.path,
-      strokeColor: PIPELINE_STYLE.glowColor,
-      strokeOpacity: PIPELINE_STYLE.glowOpacity,
-      strokeWeight: PIPELINE_STYLE.glowWeight,
-      strokeStyle: 'solid',
-      lineJoin: PIPELINE_STYLE.lineJoin,
-      lineCap: PIPELINE_STYLE.lineCap,
-      zIndex: PIPELINE_STYLE.zIndexGlow
-    }));
-
-    overlays.push(new AMap.Polyline({
-      path: feature.path,
-      strokeColor: PIPELINE_STYLE.strokeColor,
-      strokeOpacity: PIPELINE_STYLE.strokeOpacity,
-      strokeWeight: PIPELINE_STYLE.strokeWeight,
-      strokeStyle: 'solid',
-      lineJoin: PIPELINE_STYLE.lineJoin,
-      lineCap: PIPELINE_STYLE.lineCap,
-      zIndex: PIPELINE_STYLE.zIndexTop
-    }));
   });
 
-  projected.valves.forEach(function(valve){
-    overlays.push(createValveSymbol(valve));
+  dxfOverlays = fitOverlays;
+  map.add(fitOverlays);
+
+  var unavailableReason = getPipeline3DUnavailableReason();
+  if (unavailableReason) {
+    projected.visibleValveCount = 0;
+    setStats(formatProjectedStats(projected));
+    setStatus('3D 图层未加载：' + unavailableReason + '。未绘制二维管线 fallback。');
+    return;
+  }
+
+  renderValveOverlays(projected);
+
+  try {
+    dxfThreeLayer = createPipeline3DLayer(projected, projectionLabel);
+    map.add(dxfThreeLayer);
+    if (typeof map.render === 'function') map.render();
+  } catch (error) {
+    console.error('Failed to create 3D pipeline layer', error);
+    clearValveOverlays();
+    projected.visibleValveCount = 0;
+    setStats(formatProjectedStats(projected));
+    dxfThreeLayer = null;
+    dxfThreeState = null;
+    setStatus('3D 图层未加载：' + error.message + '。未绘制二维管线 fallback。');
+  }
+}
+
+function getPipeline3DUnavailableReason(){
+  if (window.__THREE_LOAD_FAILED) return 'Three 本地脚本加载失败';
+  if (!window.THREE) return 'THREE 不可用';
+  if (!AMap.GLCustomLayer) return 'AMap.GLCustomLayer 不可用';
+  if (!map.customCoords) return 'map.customCoords 不可用';
+  return '';
+}
+
+function initValveRefreshEvents(){
+  ['moveend', 'zoomend', 'rotateend', 'pitchend'].forEach(function(eventName){
+    map.on(eventName, function(){
+      if (!currentProjected || !window.__PIPELINE_3D_READY) return;
+      renderValveOverlays(currentProjected);
+      setStats(formatProjectedStats(currentProjected));
+      if (dxfThreeState && dxfThreeState.ready) {
+        setPipelineReadyStatus(currentProjected, dxfThreeState.projectionLabel);
+      }
+    });
+  });
+}
+
+function renderValveOverlays(projected){
+  clearValveOverlays();
+  var visibleValves = dedupeValvesByScreenDistance(projected.valves);
+  projected.visibleValveCount = visibleValves.length;
+  visibleValves.forEach(function(valve){
+    dxfValveOverlays.push(createValveSymbol(valve));
     if (VALVE_STYLE.showLabel) {
-      overlays.push(createValveLabel(valve));
+      dxfValveOverlays.push(createValveLabel(valve));
     }
   });
+  if (!dxfValveOverlays.length) return;
+  dxfOverlays = dxfOverlays.concat(dxfValveOverlays);
+  map.add(dxfValveOverlays);
+}
 
-  dxfOverlays = overlays;
-  map.add(overlays);
+function clearValveOverlays(){
+  if (!dxfValveOverlays.length) return;
+  map.remove(dxfValveOverlays);
+  dxfOverlays = dxfOverlays.filter(function(overlay){
+    return dxfValveOverlays.indexOf(overlay) === -1;
+  });
+  dxfValveOverlays = [];
+}
+
+function dedupeValvesByScreenDistance(valves){
+  var kept = [];
+  var keptPixels = [];
+  valves.forEach(function(valve){
+    var pixel = getValveContainerPixel(valve);
+    if (!pixel) return;
+    for (var i = 0; i < keptPixels.length; i += 1) {
+      if (pixelDistance(pixel, keptPixels[i]) <= VALVE_STYLE.dedupePixelDistance) {
+        return;
+      }
+    }
+    kept.push(valve);
+    keptPixels.push(pixel);
+  });
+  return kept;
+}
+
+function getValveContainerPixel(valve){
+  if (!map || typeof map.lngLatToContainer !== 'function') return null;
+  var pixel = map.lngLatToContainer(valve.lnglat);
+  if (!pixel) return null;
+  var x = Number.isFinite(pixel.x) ? pixel.x : pixel.getX && pixel.getX();
+  var y = Number.isFinite(pixel.y) ? pixel.y : pixel.getY && pixel.getY();
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return {x: x, y: y};
+}
+
+function pixelDistance(a, b){
+  var dx = a.x - b.x;
+  var dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function createPipeline3DLayer(projected, projectionLabel){
+  var renderCenter = getPipelineRenderCenter(projected);
+  var state = {
+    projected: projected,
+    projectionLabel: projectionLabel,
+    center: renderCenter,
+    renderer: null,
+    camera: null,
+    scene: null,
+    customCoords: map.customCoords,
+    ready: false
+  };
+  dxfThreeState = state;
+
+  return new AMap.GLCustomLayer({
+    zIndex: PIPELINE_3D_STYLE.zIndex,
+    init: function(gl){
+      state.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 100, 1 << 30);
+      state.renderer = new THREE.WebGLRenderer({
+        context: gl,
+        canvas: gl.canvas
+      });
+      state.renderer.autoClear = false;
+      state.scene = new THREE.Scene();
+      state.scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+      var keyLight = new THREE.DirectionalLight(0xffffff, 0.95);
+      keyLight.position.set(900, -500, 1200);
+      state.scene.add(keyLight);
+      state.customCoords.setCenter(state.center);
+      buildPipeline3DScene(state);
+    },
+    render: function(){
+      if (!state.renderer || !state.camera || !state.scene) return;
+      state.renderer.resetState();
+      state.customCoords.setCenter(state.center);
+      var cameraParams = state.customCoords.getCameraParams();
+      state.camera.near = cameraParams.near;
+      state.camera.far = cameraParams.far;
+      state.camera.fov = cameraParams.fov;
+      state.camera.position.set.apply(state.camera.position, cameraParams.position);
+      state.camera.up.set.apply(state.camera.up, cameraParams.up);
+      state.camera.lookAt.apply(state.camera, cameraParams.lookAt);
+      state.camera.updateProjectionMatrix();
+      state.renderer.render(state.scene, state.camera);
+      state.renderer.resetState();
+
+      if (!state.ready) {
+        state.ready = true;
+        window.__PIPELINE_3D_READY = true;
+        setStats(formatProjectedStats(state.projected));
+        setPipelineReadyStatus(state.projected, state.projectionLabel);
+      }
+    }
+  });
+}
+
+function setPipelineReadyStatus(projected, projectionLabel){
+  setStatus(
+    '真实 3D 图层已加载；' +
+    formatProjectedStats(projected) +
+    '；坐标系: ' + projectionLabel
+  );
+}
+
+function buildPipeline3DScene(state){
+  var material = new THREE.MeshPhongMaterial({
+    color: PIPELINE_3D_STYLE.color,
+    emissive: PIPELINE_3D_STYLE.emissive,
+    shininess: 38,
+    specular: 0xffd49a,
+    depthTest: false,
+    depthWrite: false
+  });
+  var verticalMaterial = new THREE.MeshPhongMaterial({
+    color: PIPELINE_3D_STYLE.verticalColor,
+    emissive: PIPELINE_3D_STYLE.verticalEmissive,
+    shininess: 48,
+    specular: 0xfff0be,
+    depthTest: false,
+    depthWrite: false
+  });
+  var verticalHaloMaterial = new THREE.MeshBasicMaterial({
+    color: PIPELINE_3D_STYLE.verticalHaloColor,
+    transparent: true,
+    opacity: 0.34,
+    depthTest: false,
+    depthWrite: false
+  });
+  var verticalJointMaterial = new THREE.MeshPhongMaterial({
+    color: PIPELINE_3D_STYLE.verticalColor,
+    emissive: PIPELINE_3D_STYLE.verticalEmissive,
+    shininess: 42,
+    depthTest: false,
+    depthWrite: false
+  });
+  var segmentGeometry = new THREE.CylinderGeometry(
+    1,
+    1,
+    1,
+    PIPELINE_3D_STYLE.radialSegments,
+    1,
+    false
+  );
+  var jointGeometry = new THREE.SphereGeometry(PIPELINE_3D_STYLE.jointRadius, PIPELINE_3D_STYLE.radialSegments, 8);
+
+  state.projected.features.forEach(function(feature){
+    var coords = state.customCoords.lngLatsToCoords(feature.path.map(pointToLngLat));
+    for (var i = 1; i < feature.path.length; i += 1) {
+      var start = createThreeVector(coords[i - 1], feature.path[i - 1].height);
+      var end = createThreeVector(coords[i], feature.path[i].height);
+      var vertical = isVerticalProjectedSegment(feature.path[i - 1], feature.path[i]);
+      if (vertical) {
+        addPipeSegment(
+          state.scene,
+          segmentGeometry,
+          verticalHaloMaterial,
+          start,
+          end,
+          PIPELINE_3D_STYLE.verticalHaloRadius,
+          9
+        );
+      }
+      addPipeSegment(
+        state.scene,
+        segmentGeometry,
+        vertical ? verticalMaterial : material,
+        start,
+        end,
+        vertical ? PIPELINE_3D_STYLE.verticalRadius : PIPELINE_3D_STYLE.radius,
+        vertical ? 12 : 10
+      );
+      if (vertical) {
+        addPipelineJoint(state.scene, jointGeometry, verticalJointMaterial, start);
+        addPipelineJoint(state.scene, jointGeometry, verticalJointMaterial, end);
+      }
+    }
+  });
+}
+
+function addPipeSegment(scene, geometry, material, start, end, radius, renderOrder){
+  var direction = new THREE.Vector3().subVectors(end, start);
+  var length = direction.length();
+  if (length <= 0.001) return;
+  var mesh = new THREE.Mesh(geometry, material);
+  mesh.position.copy(start).add(end).multiplyScalar(0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
+  mesh.renderOrder = Number.isFinite(renderOrder) ? renderOrder : 10;
+  mesh.scale.set(radius, length, radius);
+  scene.add(mesh);
+}
+
+function addPipelineJoint(scene, geometry, material, position){
+  var joint = new THREE.Mesh(geometry, material);
+  joint.position.copy(position);
+  joint.renderOrder = 11;
+  scene.add(joint);
+}
+
+function createThreeVector(coord, height){
+  return new THREE.Vector3(coord[0], coord[1], Number.isFinite(height) ? height : 0);
+}
+
+function getPipelineRenderCenter(projected){
+  if (projected.bounds) {
+    return [
+      (projected.bounds.minLng + projected.bounds.maxLng) / 2,
+      (projected.bounds.minLat + projected.bounds.maxLat) / 2
+    ];
+  }
+  for (var i = 0; i < projected.features.length; i += 1) {
+    if (projected.features[i].path.length) {
+      return pointToLngLat(projected.features[i].path[0]);
+    }
+  }
+  return VIEW_PRESET.center;
+}
+
+function pointToLngLat(point){
+  if (Array.isArray(point)) return [point[0], point[1]];
+  return [point.lng, point.lat];
+}
+
+function isVerticalProjectedSegment(a, b){
+  return isVerticalSegment(a, b);
 }
 
 function createValveSymbol(valve){
@@ -944,7 +1296,7 @@ function createValveSymbol(valve){
   return new AMap.Marker({
     position: valve.lnglat,
     zIndex: VALVE_STYLE.zIndex,
-    offset: new AMap.Pixel(-19, -52),
+    offset: new AMap.Pixel(-VALVE_STYLE.width / 2, -VALVE_STYLE.height),
     title: valve.name || '阀门',
     content: createValveSvg(rotation)
   });
@@ -953,8 +1305,8 @@ function createValveSymbol(valve){
 function createValveSvg(rotation){
   var symbolRotation = Number.isFinite(rotation) ? rotation : 0;
   return [
-    '<div style="width:38px;height:52px;transform:translateY(-2px);">',
-      '<svg width="38" height="52" viewBox="0 0 38 52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">',
+    '<div style="width:' + VALVE_STYLE.width + 'px;height:' + VALVE_STYLE.height + 'px;transform:translateY(-2px);">',
+      '<svg width="' + VALVE_STYLE.width + '" height="' + VALVE_STYLE.height + '" viewBox="0 0 38 52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">',
         '<defs>',
           '<filter id="valveShadow" x="-40%" y="-30%" width="180%" height="180%">',
             '<feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="rgba(35,21,9,0.42)"/>',
@@ -996,9 +1348,41 @@ function createValveLabel(valve){
 }
 
 function clearDxfOverlays(){
-  if (!dxfOverlays.length) return;
-  map.remove(dxfOverlays);
+  if (dxfThreeLayer) {
+    disposePipeline3DState(dxfThreeState);
+    try {
+      map.remove(dxfThreeLayer);
+    } catch (error) {
+      console.warn('Failed to remove 3D pipeline layer', error);
+    }
+    dxfThreeLayer = null;
+    dxfThreeState = null;
+  }
+  if (dxfOverlays.length) {
+    map.remove(dxfOverlays);
+  }
   dxfOverlays = [];
+  dxfValveOverlays = [];
+  currentProjected = null;
+  window.__PIPELINE_3D_READY = false;
+}
+
+function disposePipeline3DState(state){
+  if (!state || !state.scene) return;
+  state.scene.traverse(function(object){
+    if (object.geometry && typeof object.geometry.dispose === 'function') {
+      object.geometry.dispose();
+    }
+    if (object.material) {
+      if (Array.isArray(object.material)) {
+        object.material.forEach(function(material){
+          if (material && typeof material.dispose === 'function') material.dispose();
+        });
+      } else if (typeof object.material.dispose === 'function') {
+        object.material.dispose();
+      }
+    }
+  });
 }
 
 function fitPipelineView(){
@@ -1019,6 +1403,35 @@ function hasViewParamsInUrl(){
 
 function setStats(message){
   document.getElementById('pipelineStats').textContent = message;
+}
+
+function formatProjectedStats(projected){
+  return [
+    projected.features.length + ' 条管线',
+    projected.valves.length + ' 个阀门',
+    '显示阀门 ' + projected.visibleValveCount + ' 个',
+    '实际高差 ' + projected.zRange.delta.toFixed(2) + 'm',
+    '显示x' + PIPELINE_3D_STYLE.heightScale,
+    projected.verticalSegments + ' 处竖向',
+    window.__PIPELINE_3D_READY ? '真实3D图层' : '等待真实3D图层'
+  ].join(' / ');
+}
+
+function makePoint(x, y, z){
+  return [x, y, normalizeZ(z)];
+}
+
+function normalizeZ(z){
+  return Number.isFinite(z) ? z : 0;
+}
+
+function isVerticalSegment(a, b){
+  if (!a || !b) return false;
+  var dx = a.x - b.x;
+  var dy = a.y - b.y;
+  var planarDistance = Math.sqrt(dx * dx + dy * dy);
+  return planarDistance <= PIPELINE_3D_STYLE.verticalPlanarTolerance &&
+    Math.abs(a.z - b.z) > PIPELINE_3D_STYLE.verticalHeightTolerance;
 }
 
 function firstValue(values){
