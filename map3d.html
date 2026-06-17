@@ -227,6 +227,7 @@ var VIEW_PRESET = {
   mapStyle: 'amap://styles/normal'
 };
 var SATELLITE_LAYER_ZINDEX = 1;
+var ROAD_NET_LAYER_ZINDEX = 30;
 var PIPELINE_STYLE = {
   baseColor: '#382112',
   baseOpacity: 0.72,
@@ -302,6 +303,7 @@ var CRS_DEFS = {
 };
 var map;
 var satelliteLayer;
+var roadNetLayer;
 var dxfOverlays = [];
 var dxfValveOverlays = [];
 var dxfThreeLayer = null;
@@ -331,6 +333,7 @@ function mapInit(){
   });
 
   addSatelliteImageryLayer();
+  addRoadNetLayer();
 
   if (!POSTER_MODE) {
     var controlBar = new AMap.ControlBar({
@@ -362,6 +365,14 @@ function addSatelliteImageryLayer(){
     zIndex: SATELLITE_LAYER_ZINDEX
   });
   map.addLayer(satelliteLayer);
+}
+
+function addRoadNetLayer(){
+  if (!AMap.TileLayer || !AMap.TileLayer.RoadNet) return;
+  roadNetLayer = new AMap.TileLayer.RoadNet({
+    zIndex: ROAD_NET_LAYER_ZINDEX
+  });
+  map.addLayer(roadNetLayer);
 }
 
 function readViewFromUrl(){
