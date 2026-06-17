@@ -40,60 +40,7 @@ body::after{
 html.poster-mode #container{
   resize:none!important;
 }
-.panel{
-  position:fixed;
-  left:12px;
-  top:12px;
-  z-index:40;
-  display:flex;
-  flex-wrap:wrap;
-  gap:7px;
-  align-items:center;
-  padding:8px;
-  max-width:min(660px, calc(100vw - 24px));
-  background:rgba(3,10,23,0.68);
-  border:1px solid rgba(78,150,238,0.22);
-  border-radius:6px;
-  box-shadow:0 12px 32px rgba(0,0,0,0.38);
-  backdrop-filter:blur(10px);
-}
-.panel button,
-.panel select{
-  height:30px;
-  padding:0 9px;
-  border:1px solid rgba(87,157,239,0.36);
-  border-radius:4px;
-  background:rgba(7,22,45,0.86);
-  color:#dceeff;
-  font-size:12px;
-}
-.panel button{cursor:pointer}
-.panel button:hover,
-.panel select:hover{
-  border-color:rgba(113,197,255,0.86);
-  background:rgba(14,47,84,0.94);
-}
-.panel button:disabled{cursor:not-allowed;opacity:.45}
-.panel .hint{
-  flex:1 1 100%;
-  color:#8fb3d0;
-  font-size:12px;
-}
-.badge{
-  display:inline-flex;
-  align-items:center;
-  height:24px;
-  padding:0 10px;
-  border-radius:999px;
-  background:rgba(0,74,168,0.26);
-  color:#b6dcff;
-  border:1px solid rgba(92,168,246,0.38);
-  text-shadow:0 0 8px rgba(52,134,230,0.55);
-}
 .poster-caption{
-  display:none;
-}
-html.poster-mode .panel{
   display:none;
 }
 html.poster-mode .poster-caption{
@@ -145,19 +92,6 @@ html.poster-mode .poster-caption{
   height:28px;
   display:inline-block;
 }
-@media (max-width: 720px){
-  .panel{
-    left:8px;
-    right:8px;
-    top:8px;
-    max-width:none;
-  }
-  .panel button,
-  .panel select{
-    flex:1 1 auto;
-    min-width:118px;
-  }
-}
 @media (max-width: 900px){
   html.poster-mode .poster-caption{
     left:24px;
@@ -170,6 +104,243 @@ html.poster-mode .poster-caption{
     line-height:24px;
   }
 }
+.map-console{
+  position:fixed;
+  left:14px;
+  top:14px;
+  z-index:40;
+  width:min(408px, calc(100vw - 28px));
+  max-height:calc(100vh - 28px);
+  display:flex;
+  flex-direction:column;
+  color:#e6edf3;
+  background:linear-gradient(180deg, rgba(17,22,28,0.94), rgba(10,13,18,0.91));
+  border:1px solid rgba(208,221,233,0.12);
+  border-radius:8px;
+  box-shadow:0 18px 46px rgba(0,0,0,0.42);
+  backdrop-filter:blur(14px) saturate(1.12);
+  overflow:hidden;
+}
+.console-head{
+  display:grid;
+  grid-template-columns:1fr 36px;
+  gap:12px;
+  align-items:start;
+  padding:14px 14px 12px;
+  border-bottom:1px solid rgba(214,225,235,0.1);
+  background:rgba(255,255,255,0.025);
+}
+.console-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:#f5f7fa;
+  font-size:14px;
+  line-height:20px;
+  font-weight:600;
+}
+.console-title::before{
+  content:"";
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#ff6b2b;
+  box-shadow:0 0 14px rgba(255,107,43,0.82);
+}
+.console-summary{
+  display:inline-flex;
+  align-items:center;
+  max-width:100%;
+  margin-top:7px;
+  padding:4px 8px;
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:999px;
+  color:#aab5bf;
+  background:rgba(0,0,0,0.18);
+  font-size:11px;
+  line-height:15px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.console-actions,
+.console-tabs{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.console-actions{
+  padding:10px 14px;
+  border-bottom:1px solid rgba(214,225,235,0.08);
+}
+.map-console button,
+.map-console select,
+.map-console input{
+  height:32px;
+  min-width:0;
+  border:1px solid rgba(219,228,237,0.13);
+  border-radius:5px;
+  background:rgba(255,255,255,0.055);
+  color:#e6edf3;
+  font-size:12px;
+  outline:none;
+  transition:border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease;
+}
+.map-console button{
+  padding:0 10px;
+  cursor:pointer;
+}
+.map-console button:hover,
+.map-console select:hover,
+.map-console input:hover{
+  border-color:rgba(255,136,70,0.58);
+  background:rgba(255,255,255,0.085);
+}
+.map-console button:focus-visible,
+.map-console select:focus-visible,
+.map-console input:focus-visible{
+  border-color:rgba(255,136,70,0.86);
+  box-shadow:0 0 0 2px rgba(255,107,43,0.18);
+}
+.map-console button:disabled{
+  cursor:not-allowed;
+  opacity:.42;
+}
+.console-toggle{
+  width:34px;
+  height:34px!important;
+  padding:0!important;
+  border-radius:6px!important;
+  color:#f7c7ae!important;
+  background:rgba(255,107,43,0.1)!important;
+  font-size:20px!important;
+  line-height:1!important;
+}
+.primary-action{
+  border-color:rgba(255,107,43,0.68)!important;
+  background:linear-gradient(180deg, rgba(255,107,43,0.95), rgba(196,61,31,0.92))!important;
+  color:#fff8f2!important;
+  font-weight:600;
+  box-shadow:0 10px 24px rgba(206,68,29,0.24);
+}
+.console-tabs{
+  padding:10px 14px 0;
+}
+.tab-button{
+  flex:1 1 auto;
+  height:30px!important;
+  padding:0 7px!important;
+  color:#9da8b3;
+  background:rgba(255,255,255,0.035)!important;
+}
+.tab-button.active{
+  color:#fff3eb;
+  border-color:rgba(255,107,43,0.62);
+  background:rgba(255,107,43,0.16)!important;
+}
+.console-body{
+  overflow:auto;
+  padding:12px 14px 14px;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(255,255,255,0.22) transparent;
+}
+.tab-panel{
+  display:none;
+}
+.tab-panel.active{
+  display:block;
+}
+.control-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:10px;
+}
+.control-grid.single{
+  grid-template-columns:1fr;
+}
+.control-field{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  color:#aab5bf;
+  font-size:11px;
+  line-height:15px;
+}
+.control-field input,
+.control-field select{
+  width:100%;
+  padding:0 8px;
+  box-sizing:border-box;
+}
+.color-row{
+  display:grid;
+  grid-template-columns:38px 1fr;
+  gap:8px;
+  align-items:center;
+}
+.color-row input[type="color"]{
+  width:38px;
+  padding:0;
+  overflow:hidden;
+  cursor:pointer;
+}
+.control-field input[type="range"]{
+  padding:0;
+  accent-color:#ff6b2b;
+}
+.section-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:14px 0 9px;
+  color:#d2dae2;
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.08em;
+}
+.section-title::after{
+  content:"";
+  flex:1;
+  height:1px;
+  background:rgba(214,225,235,0.09);
+}
+.map-console.collapsed{
+  width:min(236px, calc(100vw - 28px));
+}
+.map-console.collapsed .console-actions,
+.map-console.collapsed .console-tabs,
+.map-console.collapsed .console-body{
+  display:none;
+}
+.map-console.collapsed .console-head{
+  grid-template-columns:1fr 36px;
+  padding:10px 10px 10px 12px;
+}
+.map-console.collapsed .console-summary{
+  display:none;
+}
+.map-console.collapsed .console-toggle{
+  color:#fff8f2!important;
+  background:rgba(255,107,43,0.22)!important;
+}
+html.poster-mode .map-console{
+  display:none;
+}
+@media (max-width: 720px){
+  .map-console{
+    left:8px;
+    right:8px;
+    top:8px;
+    width:auto;
+    max-height:calc(100vh - 16px);
+  }
+  .control-grid{
+    grid-template-columns:1fr;
+  }
+  .console-actions button{
+    flex:1 1 calc(50% - 8px);
+  }
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.9.2/dist/proj4.js"></script>
 <script>
@@ -180,19 +351,109 @@ window.__THREE_LOAD_FAILED = false;
 </head>
 <body>
 <div id="container" style="width:100%; height:100%;resize:both;"></div>
-<div class="panel">
-  <button id="loadDxfBtn" type="button">重新加载 DXF</button>
-  <button id="pickDxfBtn" type="button">选择本地 DXF</button>
+<div id="mapConsole" class="map-console">
+  <div class="console-head">
+    <div>
+      <div class="console-title">地图控制台</div>
+      <div id="statusSummary" class="console-summary">待加载</div>
+    </div>
+    <button id="toggleConsoleBtn" class="console-toggle" type="button" title="收起面板" aria-label="收起面板">‹</button>
+  </div>
+  <div class="console-actions">
+    <button id="loadDxfBtn" type="button">重载</button>
+    <button id="fitPipelineBtn" type="button" disabled>定位</button>
+    <button id="saveStyleConfigBtn" type="button">保存</button>
+    <button id="exportPosterBtn" class="primary-action" type="button">导出高清图</button>
+  </div>
+  <div class="console-tabs">
+    <button class="tab-button active" type="button" data-tab="data">数据</button>
+    <button class="tab-button" type="button" data-tab="area">范围</button>
+    <button class="tab-button" type="button" data-tab="style">样式</button>
+    <button class="tab-button" type="button" data-tab="layers">层级</button>
+    <button class="tab-button" type="button" data-tab="export">导出</button>
+    <button class="tab-button" type="button" data-tab="advanced">高级</button>
+  </div>
+  <div class="console-body">
+    <section class="tab-panel active" data-panel="data">
+      <div class="control-grid single">
+        <button id="pickDxfBtn" type="button">选择本地 DXF</button>
+      </div>
   <input id="dxfFileInput" type="file" accept=".dxf" style="display:none;">
+      <div class="section-title">坐标系</div>
+      <div class="control-grid single">
+        <label class="control-field">坐标系
   <select id="crsSelect">
     <option value="cgcs2000-gk-117">CGCS2000 3° GK 117E</option>
     <option value="cgcs2000-gk-114">CGCS2000 3° GK 114E</option>
     <option value="cgcs2000-gk-120">CGCS2000 3° GK 120E</option>
     <option value="cgcs2000-utm-50n">CGCS2000 UTM 50N</option>
   </select>
-  <button id="fitPipelineBtn" type="button" disabled>定位到管线</button>
-  <span id="pipelineStats" class="badge">待加载</span>
-  <span id="statusText" class="hint">默认按文件自带坐标加载；若位置不对，切换坐标系后重载。</span>
+        </label>
+      </div>
+    </section>
+    <section class="tab-panel" data-panel="area">
+      <div class="control-grid">
+  <button id="drawBuildingAreaBtn" type="button">绘制楼块范围</button>
+  <button id="saveBuildingAreaBtn" type="button" disabled>保存范围</button>
+  <button id="clearBuildingAreaBtn" type="button">清除范围</button>
+      </div>
+      <div class="section-title">范围样式</div>
+      <div class="control-grid">
+        <label class="control-field">范围填充<span class="color-row"><input id="areaFillColorInput" type="color"><input id="areaFillAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">范围外底色<span class="color-row"><input id="areaOutsideFillColorInput" type="color"><input id="areaOutsideFillAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">框线颜色<span class="color-row"><input id="areaStrokeColorInput" type="color"><input id="areaStrokeAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">框线粗细<input id="areaStrokeWeightInput" type="range" min="0" max="20" step="0.5"></label>
+      </div>
+    </section>
+    <section class="tab-panel" data-panel="style">
+      <div class="control-grid">
+        <label class="control-field">楼顶颜色<span class="color-row"><input id="buildingRoofColorInput" type="color"><input id="buildingRoofAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">楼体颜色<span class="color-row"><input id="buildingWallColorInput" type="color"><input id="buildingWallAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+      </div>
+    </section>
+    <section class="tab-panel" data-panel="layers">
+      <div class="control-grid">
+        <label class="control-field">卫星层级<input id="satelliteLayerZInput" type="number" min="0" max="10000" step="1"></label>
+        <label class="control-field">道路层级<input id="roadLayerZInput" type="number" min="0" max="10000" step="1"></label>
+        <label class="control-field">范围外层级<input id="outsideMaskLayerZInput" type="number" min="0" max="10000" step="1"></label>
+        <label class="control-field">范围面层级<input id="areaLayerZInput" type="number" min="0" max="10000" step="1"></label>
+        <label class="control-field">模型层级<input id="modelLayerZInput" type="number" min="0" max="10000" step="1"></label>
+        <label class="control-field">管线层级<input id="pipelineLayerZInput" type="number" min="0" max="10000" step="1"></label>
+        <label class="control-field">文字层级<input id="labelLayerZInput" type="number" min="0" max="10000" step="1"></label>
+      </div>
+    </section>
+    <section class="tab-panel" data-panel="export">
+      <div class="control-grid">
+        <label class="control-field">宽度<input id="exportWidthInput" type="number" min="320" max="10000" step="1"></label>
+        <label class="control-field">高度<input id="exportHeightInput" type="number" min="240" max="10000" step="1"></label>
+        <label class="control-field">倍率<input id="exportScaleInput" type="number" min="1" max="8" step="0.5"></label>
+        <label class="control-field">稳定等待(ms)<input id="exportSettleInput" type="number" min="0" max="180000" step="1000"></label>
+        <label class="control-field">最大等待(ms)<input id="exportWaitInput" type="number" min="5000" max="240000" step="1000"></label>
+      </div>
+    </section>
+    <section class="tab-panel" data-panel="advanced">
+      <div class="section-title">管线</div>
+      <div class="control-grid">
+        <label class="control-field">管线颜色<span class="color-row"><input id="pipelineColorInput" type="color"><input id="pipelineAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">竖管颜色<span class="color-row"><input id="pipelineVerticalColorInput" type="color"><input id="pipelineVerticalAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">地下颜色<span class="color-row"><input id="pipelineUndergroundColorInput" type="color"><input id="pipelineUndergroundAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">管线粗细<input id="pipelineRadiusInput" type="number" min="0.05" max="5" step="0.01"></label>
+        <label class="control-field">竖管粗细<input id="pipelineVerticalRadiusInput" type="number" min="0.05" max="5" step="0.01"></label>
+        <label class="control-field">地面半径<input id="pipelineGroundRadiusInput" type="number" min="0" max="5" step="0.05"></label>
+        <label class="control-field">整体下移<input id="pipelineGroundOffsetInput" type="number" min="-20" max="20" step="0.05"></label>
+      </div>
+      <div class="section-title">阀门</div>
+      <div class="control-grid">
+        <label class="control-field">图标宽<input id="valveWidthInput" type="number" min="12" max="80" step="1"></label>
+        <label class="control-field">图标高<input id="valveHeightInput" type="number" min="16" max="100" step="1"></label>
+        <label class="control-field">聚合距离<input id="valveDedupeInput" type="number" min="0" max="120" step="1"></label>
+        <label class="control-field">显示文字<select id="valveShowLabelInput"><option value="false">否</option><option value="true">是</option></select></label>
+        <label class="control-field">阀门主色<span class="color-row"><input id="valveSymbolColorInput" type="color"><input id="valveSymbolAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">阀门边框<span class="color-row"><input id="valveBorderColorInput" type="color"><input id="valveBorderAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">阀门强调<span class="color-row"><input id="valveAccentColorInput" type="color"><input id="valveAccentAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+      </div>
+    </section>
+  </div>
 </div>
 <div class="poster-caption" aria-hidden="true">
   <div class="poster-title">宽厚里燃气管线总览</div>
@@ -217,6 +478,69 @@ window.__THREE_LOAD_FAILED = false;
 var DXF_FILE_NAME = '宽厚里.dxf';
 var WGS84 = 'WGS84';
 var POSTER_MODE = window.IS_POSTER_MODE === true;
+var MAP_STYLE_CONFIG_API = '/api/map-style-config';
+var BUILDING_STYLE_AREA_MIN_POINTS = 3;
+var DEFAULT_MAP_STYLE_CONFIG = {
+  area: {
+    path: [],
+    fillColor: 'rgba(79, 176, 198, 0.18)',
+    strokeColor: 'rgba(216, 244, 255, 0.62)',
+    outsideFillColor: 'rgba(0, 0, 0, 0.18)',
+    strokeWeight: 1
+  },
+  buildings: {
+    roofColor: 'rgba(232, 238, 242, 0.95)',
+    wallColor: 'rgba(96, 116, 132, 0.95)'
+  },
+  layers: {
+    satellite: 10,
+    road: 20,
+    outsideMask: 50,
+    area: 60,
+    model: 100,
+    pipeline: 180,
+    label: 240
+  },
+  ui: {
+    collapsed: false,
+    activeTab: 'data',
+    detailsOpen: false
+  },
+  view: {
+    center: [116.333926, 39.997245],
+    zoom: 17.1,
+    pitch: 64,
+    rotation: -24
+  },
+  data: {
+    projectionId: 'cgcs2000-gk-117'
+  },
+  export: {
+    width: 3000,
+    height: 1688,
+    scale: 4,
+    settle: 60000,
+    wait: 90000
+  },
+  pipeline: {
+    color: 'rgba(255, 59, 31, 1)',
+    verticalColor: 'rgba(255, 106, 0, 1)',
+    undergroundColor: 'rgba(255, 59, 31, 0.46)',
+    radius: 0.38,
+    verticalRadius: 0.55,
+    groundSearchRadius: 0.5,
+    groundOffset: 0
+  },
+  valves: {
+    width: 28,
+    height: 38,
+    dedupePixelDistance: 28,
+    showLabel: false,
+    symbolColor: '#ea7a1b',
+    borderColor: '#382112',
+    accentColor: '#ffcf7a'
+  }
+};
 var VIEW_PRESET = {
   center: [116.333926, 39.997245],
   zoom: 17.1,
@@ -228,8 +552,10 @@ var VIEW_PRESET = {
 };
 var SATELLITE_LAYER_ZINDEX = 10;
 var ROAD_NET_LAYER_ZINDEX = 20;
-var PIPELINE_LAYER_ZINDEX = 100;
-var MODEL_LAYER_ZINDEX = 160;
+var BUILDING_STYLE_OUTSIDE_ZINDEX = 50;
+var BUILDING_STYLE_AREA_ZINDEX = 60;
+var PIPELINE_LAYER_ZINDEX = 180;
+var MODEL_LAYER_ZINDEX = 100;
 var LABEL_LAYER_ZINDEX = 240;
 var PIPELINE_STYLE = {
   baseColor: '#382112',
@@ -277,8 +603,8 @@ var VALVE_STYLE = {
   poleColor: 'rgba(56, 33, 18, 0.72)',
   textColor: '#6e3a12',
   haloColor: 'rgba(247, 238, 218, 0.86)',
-  width: 32,
-  height: 44,
+  width: 28,
+  height: 38,
   dedupePixelDistance: 28,
   zIndex: LABEL_LAYER_ZINDEX,
   showLabel: false
@@ -308,6 +634,12 @@ var map;
 var satelliteLayer;
 var roadNetLayer;
 var buildingsLayer;
+var buildingStyleAreaOverlay = null;
+var buildingStyleOutsideOverlay = null;
+var mapStyleConfig = cloneMapStyleConfig(DEFAULT_MAP_STYLE_CONFIG);
+var savedBuildingStyleAreaPath = [];
+var draftBuildingStyleAreaPath = [];
+var isDrawingBuildingStyleArea = false;
 var dxfOverlays = [];
 var dxfValveOverlays = [];
 var dxfThreeLayer = null;
@@ -339,6 +671,7 @@ function mapInit(){
   addSatelliteImageryLayer();
   addRoadNetLayer();
   addBuildingsLayer();
+  loadMapStyleConfig();
 
   if (!POSTER_MODE) {
     var controlBar = new AMap.ControlBar({
@@ -367,7 +700,7 @@ function mapInit(){
 function addSatelliteImageryLayer(){
   if (!AMap.TileLayer || !AMap.TileLayer.Satellite) return;
   satelliteLayer = new AMap.TileLayer.Satellite({
-    zIndex: SATELLITE_LAYER_ZINDEX
+    zIndex: getLayerZIndex('satellite')
   });
   map.addLayer(satelliteLayer);
 }
@@ -375,7 +708,7 @@ function addSatelliteImageryLayer(){
 function addRoadNetLayer(){
   if (!AMap.TileLayer || !AMap.TileLayer.RoadNet) return;
   roadNetLayer = new AMap.TileLayer.RoadNet({
-    zIndex: ROAD_NET_LAYER_ZINDEX
+    zIndex: getLayerZIndex('road')
   });
   map.addLayer(roadNetLayer);
 }
@@ -384,17 +717,18 @@ function addBuildingsLayer(){
   // 使用官方 3D 楼块图层，替代地图默认白模。
   // 这里的构造参数控制整个图层，后面的 setStyle 再覆盖项目范围内的样式。
   if (!AMap.Buildings) return;
+  var roofColor = normalizeCssColor(mapStyleConfig.buildings.roofColor, DEFAULT_MAP_STYLE_CONFIG.buildings.roofColor);
+  var wallColor = normalizeCssColor(mapStyleConfig.buildings.wallColor, DEFAULT_MAP_STYLE_CONFIG.buildings.wallColor);
   buildingsLayer = new AMap.Buildings({
     // 模型层放在管线层之上、文字标注层之下。
-    zIndex: MODEL_LAYER_ZINDEX,
+    zIndex: getLayerZIndex('model'),
     // 高德楼块在近距离缩放级别下才有意义。
     zooms: [16, 20],
     // 1 表示使用官方楼高；只有需要夸张天际线时才调大。
     heightFactor: 1,
-    // 这些颜色是全局兜底；项目范围内的主要样式由下面的 setStyle 控制。
-    opacity: 1,
-    wallColor: 'rgba(96, 116, 132, 0.65)',
-    roofColor: 'rgba(232, 238, 242, 0.65)'
+    // 只通过 setStyle 显示范围内楼块，范围外楼块隐藏。
+    wallColor: wallColor,
+    roofColor: roofColor
   });
   map.addLayer(buildingsLayer);
 }
@@ -402,29 +736,648 @@ function addBuildingsLayer(){
 function updateBuildingsLayerStyle(projected){
   // Buildings 的样式只在 path 范围内生效，所以这里用投影后的 DXF 范围
   // 动态生成样式区域，避免写死某个城市或固定矩形。
-  if (!buildingsLayer || typeof buildingsLayer.setStyle !== 'function' || !projected || !projected.bounds) return;
+  if (!buildingsLayer || typeof buildingsLayer.setStyle !== 'function' || !projected || !projected.bounds) {
+    if (savedBuildingStyleAreaPath.length >= BUILDING_STYLE_AREA_MIN_POINTS) {
+      applyBuildingsLayerStyle(savedBuildingStyleAreaPath);
+    } else {
+      clearBuildingStyleAreaOverlay();
+    }
+    return;
+  }
+  if (savedBuildingStyleAreaPath.length >= BUILDING_STYLE_AREA_MIN_POINTS) {
+    applyBuildingsLayerStyle(savedBuildingStyleAreaPath);
+    return;
+  }
   // 加一点经纬度缓冲，让管线范围边缘外的楼块也能保持同一视觉样式。
   var padding = 0.012;
   var minLng = projected.bounds.minLng - padding;
   var minLat = projected.bounds.minLat - padding;
   var maxLng = projected.bounds.maxLng + padding;
   var maxLat = projected.bounds.maxLat + padding;
+  var stylePath = [
+    [minLng, minLat],
+    [maxLng, minLat],
+    [maxLng, maxLat],
+    [minLng, maxLat]
+  ];
+  applyBuildingsLayerStyle(stylePath);
+}
+
+function applyBuildingsLayerStyle(stylePath){
+  if (!buildingsLayer || typeof buildingsLayer.setStyle !== 'function') return;
+  var roofColor = normalizeCssColor(mapStyleConfig.buildings.roofColor, DEFAULT_MAP_STYLE_CONFIG.buildings.roofColor);
+  var wallColor = normalizeCssColor(mapStyleConfig.buildings.wallColor, DEFAULT_MAP_STYLE_CONFIG.buildings.wallColor);
   buildingsLayer.setStyle({
-    // 样式范围外的楼块仍用图层默认样式显示，不直接隐藏。
-    hideWithoutStyle: false,
+    // 只保留范围内楼块，范围外模型隐藏不显示。
+    hideWithoutStyle: true,
     areas: [{
       // AMap Buildings 中 color1 通常用于楼顶/上表面，color2 用于墙面/侧面。
-      color1: 'rgba(232, 238, 242, 0.65)',
-      color2: 'rgba(96, 116, 132, 0.65)',
+      color1: roofColor,
+      color2: wallColor,
       // 覆盖当前 DXF 管线范围及其缓冲区的矩形。
-      path: [
-        [minLng, minLat],
-        [maxLng, minLat],
-        [maxLng, maxLat],
-        [minLng, maxLat]
-      ]
+      path: stylePath
     }]
   });
+  updateBuildingStyleAreaOverlay(stylePath);
+}
+
+function updateBuildingStyleAreaOverlay(stylePath){
+  // 这个面只是把 AMap.Buildings setStyle 的生效范围可视化，
+  // 类似官方示例底部框选出的色块，不参与定位和管线渲染。
+  clearBuildingStyleAreaOverlay();
+  if (!map || !AMap.Polygon || !stylePath || !stylePath.length) return;
+  updateBuildingStyleOutsideOverlay(stylePath);
+  var fillColor = parseCssColor(mapStyleConfig.area.fillColor, DEFAULT_MAP_STYLE_CONFIG.area.fillColor);
+  var strokeColor = parseCssColor(mapStyleConfig.area.strokeColor, DEFAULT_MAP_STYLE_CONFIG.area.strokeColor);
+  buildingStyleAreaOverlay = new AMap.Polygon({
+    path: stylePath,
+    bubble: true,
+    fillColor: fillColor.hex,
+    fillOpacity: fillColor.alpha,
+    strokeColor: strokeColor.hex,
+    strokeOpacity: strokeColor.alpha,
+    strokeWeight: mapStyleConfig.area.strokeWeight,
+    zIndex: getLayerZIndex('area')
+  });
+  map.add(buildingStyleAreaOverlay);
+}
+
+function updateBuildingStyleOutsideOverlay(stylePath){
+  clearBuildingStyleOutsideOverlay();
+  if (!map || !AMap.Polygon || !stylePath || stylePath.length < BUILDING_STYLE_AREA_MIN_POINTS) return;
+  var outsideColor = parseCssColor(mapStyleConfig.area.outsideFillColor, DEFAULT_MAP_STYLE_CONFIG.area.outsideFillColor);
+  buildingStyleOutsideOverlay = new AMap.Polygon({
+    path: [
+      getOutsideMaskOuterPath(stylePath),
+      stylePath
+    ],
+    bubble: true,
+    fillColor: outsideColor.hex,
+    fillOpacity: outsideColor.alpha,
+    strokeOpacity: 0,
+    strokeWeight: 0,
+    zIndex: getLayerZIndex('outsideMask')
+  });
+  map.add(buildingStyleOutsideOverlay);
+}
+
+function getOutsideMaskOuterPath(innerPath){
+  var bounds = getPathBounds(innerPath);
+  var lngSpan = Math.max(bounds.maxLng - bounds.minLng, 0.01);
+  var latSpan = Math.max(bounds.maxLat - bounds.minLat, 0.01);
+  var padding = Math.max(lngSpan, latSpan, 0.02) * 2.5;
+  return [
+    [bounds.minLng - padding, bounds.minLat - padding],
+    [bounds.maxLng + padding, bounds.minLat - padding],
+    [bounds.maxLng + padding, bounds.maxLat + padding],
+    [bounds.minLng - padding, bounds.maxLat + padding]
+  ];
+}
+
+function getPathBounds(path){
+  return path.reduce(function(bounds, point){
+    bounds.minLng = Math.min(bounds.minLng, point[0]);
+    bounds.minLat = Math.min(bounds.minLat, point[1]);
+    bounds.maxLng = Math.max(bounds.maxLng, point[0]);
+    bounds.maxLat = Math.max(bounds.maxLat, point[1]);
+    return bounds;
+  }, {
+    minLng: Infinity,
+    minLat: Infinity,
+    maxLng: -Infinity,
+    maxLat: -Infinity
+  });
+}
+
+function rebuildBuildingsLayer(){
+  if (buildingsLayer && map) {
+    try {
+      map.remove(buildingsLayer);
+    } catch (error) {
+      console.warn('Failed to remove Buildings layer', error);
+    }
+  }
+  buildingsLayer = null;
+  addBuildingsLayer();
+}
+
+function clearBuildingStyleAreaOverlay(){
+  clearBuildingStyleOutsideOverlay();
+  if (!buildingStyleAreaOverlay || !map) return;
+  map.remove(buildingStyleAreaOverlay);
+  buildingStyleAreaOverlay = null;
+}
+
+function clearBuildingStyleOutsideOverlay(){
+  if (!buildingStyleOutsideOverlay || !map) return;
+  map.remove(buildingStyleOutsideOverlay);
+  buildingStyleOutsideOverlay = null;
+}
+
+async function loadMapStyleConfig(){
+  try {
+    var response = await fetch(MAP_STYLE_CONFIG_API, {cache: 'no-store'});
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    var result = await response.json();
+    if (!result.ok) throw new Error(result.error || '读取配置失败');
+    setMapStyleConfig(result.config);
+    applyConfiguredView();
+    setStatus('已读取本地样式配置: config/map3d-style.json');
+  } catch (error) {
+    console.warn('Failed to load map style config', error);
+    setMapStyleConfig(DEFAULT_MAP_STYLE_CONFIG);
+    setStatus('未读取到本地样式配置；如需保存到 JSON，请通过 npm run serve 打开页面。');
+  }
+}
+
+function setMapStyleConfig(config){
+  var previousBuildingConfig = JSON.stringify(mapStyleConfig.buildings);
+  mapStyleConfig = normalizeMapStyleConfig(config);
+  savedBuildingStyleAreaPath = mapStyleConfig.area.path;
+  currentProjectionId = mapStyleConfig.data.projectionId;
+  applyRuntimeStyleConfig();
+  updateStyleConfigInputs();
+  applyConsoleState();
+  applyLayerZIndexConfig();
+  if (previousBuildingConfig !== JSON.stringify(mapStyleConfig.buildings)) {
+    rebuildBuildingsLayer();
+  }
+  refreshBuildingsStyleFromCurrentState();
+}
+
+async function saveMapStyleConfig(statusMessage){
+  applyStyleConfigFromInputs();
+  try {
+    var response = await fetch(MAP_STYLE_CONFIG_API, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({config: mapStyleConfig})
+    });
+    var result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || '保存配置失败');
+    setMapStyleConfig(result.config);
+    setStatus(statusMessage || '样式配置已保存到 config/map3d-style.json');
+    return true;
+  } catch (error) {
+    console.warn('Failed to save map style config', error);
+    setStatus('保存失败：请确认页面通过 npm run serve 打开，并检查 config/map3d-style.json 是否可写。');
+    return false;
+  }
+}
+
+function refreshBuildingsStyleFromCurrentState(){
+  if (savedBuildingStyleAreaPath.length >= BUILDING_STYLE_AREA_MIN_POINTS) {
+    applyBuildingsLayerStyle(savedBuildingStyleAreaPath);
+  } else if (currentProjected) {
+    updateBuildingsLayerStyle(currentProjected);
+  } else {
+    clearBuildingStyleAreaOverlay();
+  }
+}
+
+function getLayerZIndex(name){
+  if (mapStyleConfig && mapStyleConfig.layers && Number.isFinite(Number(mapStyleConfig.layers[name]))) {
+    return Number(mapStyleConfig.layers[name]);
+  }
+  return DEFAULT_MAP_STYLE_CONFIG.layers[name];
+}
+
+function applyLayerZIndexConfig(){
+  setLayerZIndex(satelliteLayer, getLayerZIndex('satellite'));
+  setLayerZIndex(roadNetLayer, getLayerZIndex('road'));
+  setLayerZIndex(buildingStyleOutsideOverlay, getLayerZIndex('outsideMask'));
+  setLayerZIndex(buildingStyleAreaOverlay, getLayerZIndex('area'));
+  setLayerZIndex(buildingsLayer, getLayerZIndex('model'));
+  setLayerZIndex(dxfThreeLayer, getLayerZIndex('pipeline'));
+  refreshPipelineFitOverlayZIndexes();
+  refreshValveLayerZIndexes();
+}
+
+function setLayerZIndex(layer, zIndex){
+  if (!layer) return;
+  if (typeof layer.setzIndex === 'function') {
+    layer.setzIndex(zIndex);
+    return;
+  }
+  if (typeof layer.setZIndex === 'function') {
+    layer.setZIndex(zIndex);
+    return;
+  }
+  if (typeof layer.setOptions === 'function') {
+    layer.setOptions({zIndex: zIndex});
+    return;
+  }
+  layer.zIndex = zIndex;
+}
+
+function refreshPipelineFitOverlayZIndexes(){
+  dxfOverlays.forEach(function(overlay){
+    if (dxfValveOverlays.indexOf(overlay) !== -1) return;
+    setLayerZIndex(overlay, getLayerZIndex('pipeline'));
+  });
+}
+
+function refreshValveLayerZIndexes(){
+  dxfValveOverlays.forEach(function(overlay, index){
+    setLayerZIndex(overlay, getLayerZIndex('label') + index);
+  });
+}
+
+function getCurrentUiConfig(){
+  var consoleEl = document.getElementById('mapConsole');
+  var activeTab = document.querySelector('.tab-button.active');
+  return {
+    collapsed: consoleEl ? consoleEl.classList.contains('collapsed') : false,
+    activeTab: activeTab ? activeTab.getAttribute('data-tab') : DEFAULT_MAP_STYLE_CONFIG.ui.activeTab,
+    detailsOpen: false
+  };
+}
+
+function getCurrentViewConfig(){
+  if (!map) return mapStyleConfig.view || DEFAULT_MAP_STYLE_CONFIG.view;
+  return getCurrentMapView();
+}
+
+function applyConsoleState(){
+  var consoleEl = document.getElementById('mapConsole');
+  if (!consoleEl) return;
+  consoleEl.classList.toggle('collapsed', mapStyleConfig.ui.collapsed);
+  updateConsoleToggleState();
+  activateConsoleTab(mapStyleConfig.ui.activeTab, false);
+}
+
+function updateConsoleToggleState(){
+  var consoleEl = document.getElementById('mapConsole');
+  var toggleBtn = document.getElementById('toggleConsoleBtn');
+  if (!consoleEl || !toggleBtn) return;
+  var collapsed = consoleEl.classList.contains('collapsed');
+  toggleBtn.textContent = collapsed ? '›' : '‹';
+  toggleBtn.title = collapsed ? '展开面板' : '收起面板';
+  toggleBtn.setAttribute('aria-label', toggleBtn.title);
+}
+
+function activateConsoleTab(tabName, persist){
+  var tab = normalizeChoice(tabName, DEFAULT_MAP_STYLE_CONFIG.ui.activeTab, ['data', 'area', 'style', 'layers', 'export', 'advanced']);
+  document.querySelectorAll('.tab-button').forEach(function(button){
+    button.classList.toggle('active', button.getAttribute('data-tab') === tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(function(panel){
+    panel.classList.toggle('active', panel.getAttribute('data-panel') === tab);
+  });
+  mapStyleConfig.ui.activeTab = tab;
+  if (persist) saveMapStyleConfig('面板标签已保存到 config/map3d-style.json');
+}
+
+function applyConfiguredView(){
+  if (!map || hasViewParamsInUrl()) return;
+  var view = mapStyleConfig.view;
+  if (!view) return;
+  if (Array.isArray(view.center) && typeof map.setCenter === 'function') map.setCenter(view.center);
+  if (typeof map.setZoom === 'function') map.setZoom(view.zoom);
+  if (typeof map.setPitch === 'function') map.setPitch(view.pitch);
+  if (typeof map.setRotation === 'function') map.setRotation(view.rotation);
+}
+
+function cloneMapStyleConfig(config){
+  return JSON.parse(JSON.stringify(config));
+}
+
+function normalizeMapStyleConfig(config){
+  var source = config && typeof config === 'object' ? config : {};
+  var area = source.area || {};
+  var buildings = source.buildings || {};
+  return {
+    area: {
+      path: normalizeBuildingStyleAreaPath(area.path),
+      fillColor: normalizeCssColor(area.fillColor, DEFAULT_MAP_STYLE_CONFIG.area.fillColor),
+      strokeColor: normalizeCssColor(area.strokeColor, DEFAULT_MAP_STYLE_CONFIG.area.strokeColor),
+      outsideFillColor: normalizeCssColor(area.outsideFillColor, DEFAULT_MAP_STYLE_CONFIG.area.outsideFillColor),
+      strokeWeight: normalizeStrokeWeight(area.strokeWeight)
+    },
+    buildings: {
+      roofColor: normalizeCssColor(buildings.roofColor, DEFAULT_MAP_STYLE_CONFIG.buildings.roofColor),
+      wallColor: normalizeCssColor(buildings.wallColor, DEFAULT_MAP_STYLE_CONFIG.buildings.wallColor)
+    },
+    layers: {
+      satellite: normalizeLayerZIndex(source.layers && source.layers.satellite, DEFAULT_MAP_STYLE_CONFIG.layers.satellite),
+      road: normalizeLayerZIndex(source.layers && source.layers.road, DEFAULT_MAP_STYLE_CONFIG.layers.road),
+      outsideMask: normalizeLayerZIndex(source.layers && source.layers.outsideMask, DEFAULT_MAP_STYLE_CONFIG.layers.outsideMask),
+      area: normalizeLayerZIndex(source.layers && source.layers.area, DEFAULT_MAP_STYLE_CONFIG.layers.area),
+      model: normalizeLayerZIndex(source.layers && source.layers.model, DEFAULT_MAP_STYLE_CONFIG.layers.model),
+      pipeline: normalizeLayerZIndex(source.layers && source.layers.pipeline, DEFAULT_MAP_STYLE_CONFIG.layers.pipeline),
+      label: normalizeLayerZIndex(source.layers && source.layers.label, DEFAULT_MAP_STYLE_CONFIG.layers.label)
+    },
+    ui: {
+      collapsed: Boolean(source.ui && source.ui.collapsed),
+      activeTab: normalizeChoice(source.ui && source.ui.activeTab, DEFAULT_MAP_STYLE_CONFIG.ui.activeTab, ['data', 'area', 'style', 'layers', 'export', 'advanced']),
+      detailsOpen: Boolean(source.ui && source.ui.detailsOpen)
+    },
+    view: {
+      center: normalizeLngLat(source.view && source.view.center, DEFAULT_MAP_STYLE_CONFIG.view.center),
+      zoom: normalizeNumber(source.view && source.view.zoom, DEFAULT_MAP_STYLE_CONFIG.view.zoom, 2, 20),
+      pitch: normalizeNumber(source.view && source.view.pitch, DEFAULT_MAP_STYLE_CONFIG.view.pitch, 0, 83),
+      rotation: normalizeNumber(source.view && source.view.rotation, DEFAULT_MAP_STYLE_CONFIG.view.rotation, -360, 360)
+    },
+    data: {
+      projectionId: normalizeChoice(source.data && source.data.projectionId, DEFAULT_MAP_STYLE_CONFIG.data.projectionId, Object.keys(CRS_DEFS))
+    },
+    export: {
+      width: normalizeInteger(source.export && source.export.width, DEFAULT_MAP_STYLE_CONFIG.export.width, 320, 10000),
+      height: normalizeInteger(source.export && source.export.height, DEFAULT_MAP_STYLE_CONFIG.export.height, 240, 10000),
+      scale: normalizeNumber(source.export && source.export.scale, DEFAULT_MAP_STYLE_CONFIG.export.scale, 1, 8),
+      settle: normalizeInteger(source.export && source.export.settle, DEFAULT_MAP_STYLE_CONFIG.export.settle, 0, 180000),
+      wait: normalizeInteger(source.export && source.export.wait, DEFAULT_MAP_STYLE_CONFIG.export.wait, 5000, 240000)
+    },
+    pipeline: {
+      color: normalizeCssColor(source.pipeline && source.pipeline.color, DEFAULT_MAP_STYLE_CONFIG.pipeline.color),
+      verticalColor: normalizeCssColor(source.pipeline && source.pipeline.verticalColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.verticalColor),
+      undergroundColor: normalizeCssColor(source.pipeline && source.pipeline.undergroundColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.undergroundColor),
+      radius: normalizeNumber(source.pipeline && source.pipeline.radius, DEFAULT_MAP_STYLE_CONFIG.pipeline.radius, 0.05, 5),
+      verticalRadius: normalizeNumber(source.pipeline && source.pipeline.verticalRadius, DEFAULT_MAP_STYLE_CONFIG.pipeline.verticalRadius, 0.05, 5),
+      groundSearchRadius: normalizeNumber(source.pipeline && source.pipeline.groundSearchRadius, DEFAULT_MAP_STYLE_CONFIG.pipeline.groundSearchRadius, 0, 5),
+      groundOffset: normalizeNumber(source.pipeline && source.pipeline.groundOffset, DEFAULT_MAP_STYLE_CONFIG.pipeline.groundOffset, -20, 20)
+    },
+    valves: {
+      width: normalizeInteger(source.valves && source.valves.width, DEFAULT_MAP_STYLE_CONFIG.valves.width, 12, 80),
+      height: normalizeInteger(source.valves && source.valves.height, DEFAULT_MAP_STYLE_CONFIG.valves.height, 16, 100),
+      dedupePixelDistance: normalizeInteger(source.valves && source.valves.dedupePixelDistance, DEFAULT_MAP_STYLE_CONFIG.valves.dedupePixelDistance, 0, 120),
+      showLabel: Boolean(source.valves && source.valves.showLabel),
+      symbolColor: normalizeCssColor(source.valves && source.valves.symbolColor, DEFAULT_MAP_STYLE_CONFIG.valves.symbolColor),
+      borderColor: normalizeCssColor(source.valves && source.valves.borderColor, DEFAULT_MAP_STYLE_CONFIG.valves.borderColor),
+      accentColor: normalizeCssColor(source.valves && source.valves.accentColor, DEFAULT_MAP_STYLE_CONFIG.valves.accentColor)
+    }
+  };
+}
+
+function normalizeBuildingStyleAreaPath(pathValue){
+  if (!Array.isArray(pathValue)) return [];
+  return pathValue.reduce(function(points, point){
+    if (!Array.isArray(point) || point.length < 2) return points;
+    var lng = Number(point[0]);
+    var lat = Number(point[1]);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return points;
+    points.push([lng, lat]);
+    return points;
+  }, []);
+}
+
+function normalizeCssColor(value, fallback){
+  if (typeof value !== 'string') return fallback;
+  var color = value.trim();
+  if (!color || color.length > 80) return fallback;
+  return color;
+}
+
+function parseCssColor(value, fallback){
+  var color = normalizeCssColor(value, fallback);
+  var rgbaMatch = color.match(/^rgba?\(\s*([0-9.]+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)(?:\s*,\s*([0-9.]+))?\s*\)$/i);
+  if (rgbaMatch) {
+    return {
+      hex: rgbToHex(Number(rgbaMatch[1]), Number(rgbaMatch[2]), Number(rgbaMatch[3])),
+      alpha: clampAlpha(rgbaMatch[4] == null ? 1 : Number(rgbaMatch[4]))
+    };
+  }
+  var hexMatch = color.match(/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+  if (hexMatch) {
+    return parseHexColor(hexMatch[1]);
+  }
+  if (color !== fallback) return parseCssColor(fallback, DEFAULT_MAP_STYLE_CONFIG.area.fillColor);
+  return {hex: '#4fb0c6', alpha: 1};
+}
+
+function parseHexColor(hexValue){
+  var hex = hexValue.toLowerCase();
+  if (hex.length === 3 || hex.length === 4) {
+    hex = hex.split('').map(function(char){ return char + char; }).join('');
+  }
+  var alpha = 1;
+  if (hex.length === 8) {
+    alpha = parseInt(hex.slice(6, 8), 16) / 255;
+    hex = hex.slice(0, 6);
+  }
+  return {hex: '#' + hex.slice(0, 6), alpha: clampAlpha(alpha)};
+}
+
+function rgbToHex(red, green, blue){
+  return '#' + [red, green, blue].map(function(value){
+    var channel = Math.max(0, Math.min(255, Math.round(Number(value) || 0)));
+    return channel.toString(16).padStart(2, '0');
+  }).join('');
+}
+
+function hexToRgb(hexColor){
+  var parsed = parseHexColor(String(hexColor || '#000000').replace(/^#/, ''));
+  var hex = parsed.hex.slice(1);
+  return [
+    parseInt(hex.slice(0, 2), 16),
+    parseInt(hex.slice(2, 4), 16),
+    parseInt(hex.slice(4, 6), 16)
+  ];
+}
+
+function clampAlpha(value){
+  var alpha = Number(value);
+  if (!Number.isFinite(alpha)) return 1;
+  return Math.max(0, Math.min(1, alpha));
+}
+
+function normalizeStrokeWeight(value){
+  var weight = Number(value);
+  if (!Number.isFinite(weight)) return DEFAULT_MAP_STYLE_CONFIG.area.strokeWeight;
+  return Math.max(0, Math.min(20, weight));
+}
+
+function normalizeLayerZIndex(value, fallback){
+  var zIndex = Number(value);
+  if (!Number.isFinite(zIndex)) return fallback;
+  return Math.max(0, Math.min(10000, Math.round(zIndex)));
+}
+
+function normalizeNumber(value, fallback, min, max){
+  var number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(min, Math.min(max, number));
+}
+
+function normalizeInteger(value, fallback, min, max){
+  return Math.round(normalizeNumber(value, fallback, min, max));
+}
+
+function normalizeChoice(value, fallback, choices){
+  return choices.indexOf(value) === -1 ? fallback : value;
+}
+
+function normalizeLngLat(value, fallback){
+  if (!Array.isArray(value) || value.length < 2) return fallback;
+  var lng = Number(value[0]);
+  var lat = Number(value[1]);
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return fallback;
+  if (lng < -180 || lng > 180 || lat < -90 || lat > 90) return fallback;
+  return [lng, lat];
+}
+
+function cssColorToNumber(value, fallback){
+  return parseInt(parseCssColor(value, fallback).hex.slice(1), 16);
+}
+
+function applyRuntimeStyleConfig(){
+  applyPipelineConfig();
+  applyValveConfig();
+}
+
+function applyPipelineConfig(){
+  PIPELINE_3D_STYLE.color = cssColorToNumber(mapStyleConfig.pipeline.color, DEFAULT_MAP_STYLE_CONFIG.pipeline.color);
+  PIPELINE_3D_STYLE.verticalColor = cssColorToNumber(mapStyleConfig.pipeline.verticalColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.verticalColor);
+  PIPELINE_3D_STYLE.undergroundColor = cssColorToNumber(mapStyleConfig.pipeline.undergroundColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.undergroundColor);
+  PIPELINE_3D_STYLE.undergroundOpacity = parseCssColor(mapStyleConfig.pipeline.undergroundColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.undergroundColor).alpha;
+  PIPELINE_3D_STYLE.radius = mapStyleConfig.pipeline.radius;
+  PIPELINE_3D_STYLE.verticalRadius = mapStyleConfig.pipeline.verticalRadius;
+  PIPELINE_3D_STYLE.groundSearchRadius = mapStyleConfig.pipeline.groundSearchRadius;
+  PIPELINE_3D_STYLE.groundOffset = mapStyleConfig.pipeline.groundOffset;
+}
+
+function applyValveConfig(){
+  VALVE_STYLE.width = mapStyleConfig.valves.width;
+  VALVE_STYLE.height = mapStyleConfig.valves.height;
+  VALVE_STYLE.dedupePixelDistance = mapStyleConfig.valves.dedupePixelDistance;
+  VALVE_STYLE.showLabel = mapStyleConfig.valves.showLabel;
+  VALVE_STYLE.symbolColor = mapStyleConfig.valves.symbolColor;
+  VALVE_STYLE.borderColor = mapStyleConfig.valves.borderColor;
+  VALVE_STYLE.accentColor = mapStyleConfig.valves.accentColor;
+  if (currentProjected && window.__PIPELINE_3D_READY) renderValveOverlays(currentProjected);
+}
+
+function updateStyleConfigInputs(){
+  setInputValue('crsSelect', mapStyleConfig.data.projectionId);
+  setColorControl('areaFillColorInput', 'areaFillAlphaInput', mapStyleConfig.area.fillColor, DEFAULT_MAP_STYLE_CONFIG.area.fillColor);
+  setColorControl('areaOutsideFillColorInput', 'areaOutsideFillAlphaInput', mapStyleConfig.area.outsideFillColor, DEFAULT_MAP_STYLE_CONFIG.area.outsideFillColor);
+  setColorControl('areaStrokeColorInput', 'areaStrokeAlphaInput', mapStyleConfig.area.strokeColor, DEFAULT_MAP_STYLE_CONFIG.area.strokeColor);
+  setInputValue('areaStrokeWeightInput', String(mapStyleConfig.area.strokeWeight));
+  setColorControl('buildingRoofColorInput', 'buildingRoofAlphaInput', mapStyleConfig.buildings.roofColor, DEFAULT_MAP_STYLE_CONFIG.buildings.roofColor);
+  setColorControl('buildingWallColorInput', 'buildingWallAlphaInput', mapStyleConfig.buildings.wallColor, DEFAULT_MAP_STYLE_CONFIG.buildings.wallColor);
+  setInputValue('satelliteLayerZInput', String(mapStyleConfig.layers.satellite));
+  setInputValue('roadLayerZInput', String(mapStyleConfig.layers.road));
+  setInputValue('outsideMaskLayerZInput', String(mapStyleConfig.layers.outsideMask));
+  setInputValue('areaLayerZInput', String(mapStyleConfig.layers.area));
+  setInputValue('modelLayerZInput', String(mapStyleConfig.layers.model));
+  setInputValue('pipelineLayerZInput', String(mapStyleConfig.layers.pipeline));
+  setInputValue('labelLayerZInput', String(mapStyleConfig.layers.label));
+  setInputValue('exportWidthInput', String(mapStyleConfig.export.width));
+  setInputValue('exportHeightInput', String(mapStyleConfig.export.height));
+  setInputValue('exportScaleInput', String(mapStyleConfig.export.scale));
+  setInputValue('exportSettleInput', String(mapStyleConfig.export.settle));
+  setInputValue('exportWaitInput', String(mapStyleConfig.export.wait));
+  setColorControl('pipelineColorInput', 'pipelineAlphaInput', mapStyleConfig.pipeline.color, DEFAULT_MAP_STYLE_CONFIG.pipeline.color);
+  setColorControl('pipelineVerticalColorInput', 'pipelineVerticalAlphaInput', mapStyleConfig.pipeline.verticalColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.verticalColor);
+  setColorControl('pipelineUndergroundColorInput', 'pipelineUndergroundAlphaInput', mapStyleConfig.pipeline.undergroundColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.undergroundColor);
+  setInputValue('pipelineRadiusInput', String(mapStyleConfig.pipeline.radius));
+  setInputValue('pipelineVerticalRadiusInput', String(mapStyleConfig.pipeline.verticalRadius));
+  setInputValue('pipelineGroundRadiusInput', String(mapStyleConfig.pipeline.groundSearchRadius));
+  setInputValue('pipelineGroundOffsetInput', String(mapStyleConfig.pipeline.groundOffset));
+  setInputValue('valveWidthInput', String(mapStyleConfig.valves.width));
+  setInputValue('valveHeightInput', String(mapStyleConfig.valves.height));
+  setInputValue('valveDedupeInput', String(mapStyleConfig.valves.dedupePixelDistance));
+  setInputValue('valveShowLabelInput', String(mapStyleConfig.valves.showLabel));
+  setColorControl('valveSymbolColorInput', 'valveSymbolAlphaInput', mapStyleConfig.valves.symbolColor, DEFAULT_MAP_STYLE_CONFIG.valves.symbolColor);
+  setColorControl('valveBorderColorInput', 'valveBorderAlphaInput', mapStyleConfig.valves.borderColor, DEFAULT_MAP_STYLE_CONFIG.valves.borderColor);
+  setColorControl('valveAccentColorInput', 'valveAccentAlphaInput', mapStyleConfig.valves.accentColor, DEFAULT_MAP_STYLE_CONFIG.valves.accentColor);
+}
+
+function applyStyleConfigFromInputs(){
+  var previousBuildingConfig = JSON.stringify(mapStyleConfig.buildings);
+  var previousLayerConfig = JSON.stringify(mapStyleConfig.layers);
+  var previousPipelineConfig = JSON.stringify(mapStyleConfig.pipeline);
+  mapStyleConfig = normalizeMapStyleConfig({
+    area: {
+      path: savedBuildingStyleAreaPath,
+      fillColor: getColorControlValue('areaFillColorInput', 'areaFillAlphaInput', DEFAULT_MAP_STYLE_CONFIG.area.fillColor),
+      outsideFillColor: getColorControlValue('areaOutsideFillColorInput', 'areaOutsideFillAlphaInput', DEFAULT_MAP_STYLE_CONFIG.area.outsideFillColor),
+      strokeColor: getColorControlValue('areaStrokeColorInput', 'areaStrokeAlphaInput', DEFAULT_MAP_STYLE_CONFIG.area.strokeColor),
+      strokeWeight: getInputValue('areaStrokeWeightInput', mapStyleConfig.area.strokeWeight)
+    },
+    buildings: {
+      roofColor: getColorControlValue('buildingRoofColorInput', 'buildingRoofAlphaInput', DEFAULT_MAP_STYLE_CONFIG.buildings.roofColor),
+      wallColor: getColorControlValue('buildingWallColorInput', 'buildingWallAlphaInput', DEFAULT_MAP_STYLE_CONFIG.buildings.wallColor)
+    },
+    layers: {
+      satellite: getInputValue('satelliteLayerZInput', mapStyleConfig.layers.satellite),
+      road: getInputValue('roadLayerZInput', mapStyleConfig.layers.road),
+      outsideMask: getInputValue('outsideMaskLayerZInput', mapStyleConfig.layers.outsideMask),
+      area: getInputValue('areaLayerZInput', mapStyleConfig.layers.area),
+      model: getInputValue('modelLayerZInput', mapStyleConfig.layers.model),
+      pipeline: getInputValue('pipelineLayerZInput', mapStyleConfig.layers.pipeline),
+      label: getInputValue('labelLayerZInput', mapStyleConfig.layers.label)
+    },
+    ui: getCurrentUiConfig(),
+    view: getCurrentViewConfig(),
+    data: {
+      projectionId: getInputValue('crsSelect', mapStyleConfig.data.projectionId)
+    },
+    export: {
+      width: getInputValue('exportWidthInput', mapStyleConfig.export.width),
+      height: getInputValue('exportHeightInput', mapStyleConfig.export.height),
+      scale: getInputValue('exportScaleInput', mapStyleConfig.export.scale),
+      settle: getInputValue('exportSettleInput', mapStyleConfig.export.settle),
+      wait: getInputValue('exportWaitInput', mapStyleConfig.export.wait)
+    },
+    pipeline: {
+      color: getColorControlValue('pipelineColorInput', 'pipelineAlphaInput', DEFAULT_MAP_STYLE_CONFIG.pipeline.color),
+      verticalColor: getColorControlValue('pipelineVerticalColorInput', 'pipelineVerticalAlphaInput', DEFAULT_MAP_STYLE_CONFIG.pipeline.verticalColor),
+      undergroundColor: getColorControlValue('pipelineUndergroundColorInput', 'pipelineUndergroundAlphaInput', DEFAULT_MAP_STYLE_CONFIG.pipeline.undergroundColor),
+      radius: getInputValue('pipelineRadiusInput', mapStyleConfig.pipeline.radius),
+      verticalRadius: getInputValue('pipelineVerticalRadiusInput', mapStyleConfig.pipeline.verticalRadius),
+      groundSearchRadius: getInputValue('pipelineGroundRadiusInput', mapStyleConfig.pipeline.groundSearchRadius),
+      groundOffset: getInputValue('pipelineGroundOffsetInput', mapStyleConfig.pipeline.groundOffset)
+    },
+    valves: {
+      width: getInputValue('valveWidthInput', mapStyleConfig.valves.width),
+      height: getInputValue('valveHeightInput', mapStyleConfig.valves.height),
+      dedupePixelDistance: getInputValue('valveDedupeInput', mapStyleConfig.valves.dedupePixelDistance),
+      showLabel: getInputValue('valveShowLabelInput', String(mapStyleConfig.valves.showLabel)) === 'true',
+      symbolColor: getColorControlValue('valveSymbolColorInput', 'valveSymbolAlphaInput', DEFAULT_MAP_STYLE_CONFIG.valves.symbolColor),
+      borderColor: getColorControlValue('valveBorderColorInput', 'valveBorderAlphaInput', DEFAULT_MAP_STYLE_CONFIG.valves.borderColor),
+      accentColor: getColorControlValue('valveAccentColorInput', 'valveAccentAlphaInput', DEFAULT_MAP_STYLE_CONFIG.valves.accentColor)
+    }
+  });
+  savedBuildingStyleAreaPath = mapStyleConfig.area.path;
+  currentProjectionId = mapStyleConfig.data.projectionId;
+  applyRuntimeStyleConfig();
+  if (previousBuildingConfig !== JSON.stringify(mapStyleConfig.buildings)) {
+    rebuildBuildingsLayer();
+  }
+  applyLayerZIndexConfig();
+  if (previousLayerConfig !== JSON.stringify(mapStyleConfig.layers)) {
+    refreshValveLayerZIndexes();
+  }
+  if (previousPipelineConfig !== JSON.stringify(mapStyleConfig.pipeline) && currentProjected && window.__PIPELINE_3D_READY) {
+    drawProjectedFeatures(currentProjected, CRS_DEFS[currentProjectionId].label);
+  }
+  updateStyleConfigInputs();
+  refreshBuildingsStyleFromCurrentState();
+}
+
+function setInputValue(id, value){
+  var input = document.getElementById(id);
+  if (input) input.value = value;
+}
+
+function getInputValue(id, fallback){
+  var input = document.getElementById(id);
+  return input ? input.value : fallback;
+}
+
+function setColorControl(colorInputId, alphaInputId, value, fallback){
+  var parsed = parseCssColor(value, fallback);
+  setInputValue(colorInputId, parsed.hex);
+  setInputValue(alphaInputId, String(parsed.alpha));
+}
+
+function getColorControlValue(colorInputId, alphaInputId, fallback){
+  var fallbackColor = parseCssColor(fallback, DEFAULT_MAP_STYLE_CONFIG.area.fillColor);
+  var hex = getInputValue(colorInputId, fallbackColor.hex);
+  var alpha = getInputValue(alphaInputId, fallbackColor.alpha);
+  var rgb = hexToRgb(hex);
+  return 'rgba(' + rgb[0] + ', ' + rgb[1] + ', ' + rgb[2] + ', ' + clampAlpha(alpha).toFixed(2) + ')';
 }
 
 function readViewFromUrl(){
@@ -461,6 +1414,7 @@ function initExportHotkeys(){
 
 async function exportCurrentPosterView(){
   if (!map) return;
+  applyStyleConfigFromInputs();
   var view = getCurrentMapView();
   setStatus('正在导出当前视角高清图，请稍候...');
   try {
@@ -469,11 +1423,11 @@ async function exportCurrentPosterView(){
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         view: view,
-        width: 3000,
-        height: 1688,
-        scale: 4,
-        settle: 60000,
-        wait: 90000
+        width: mapStyleConfig.export.width,
+        height: mapStyleConfig.export.height,
+        scale: mapStyleConfig.export.scale,
+        settle: mapStyleConfig.export.settle,
+        wait: mapStyleConfig.export.wait
       })
     });
     var result = await response.json();
@@ -520,6 +1474,12 @@ function initPipelineTools(){
   var fileInput = document.getElementById('dxfFileInput');
   var crsSelect = document.getElementById('crsSelect');
   var fitBtn = document.getElementById('fitPipelineBtn');
+  var drawBuildingAreaBtn = document.getElementById('drawBuildingAreaBtn');
+  var saveBuildingAreaBtn = document.getElementById('saveBuildingAreaBtn');
+  var clearBuildingAreaBtn = document.getElementById('clearBuildingAreaBtn');
+  var saveStyleConfigBtn = document.getElementById('saveStyleConfigBtn');
+  var exportPosterBtn = document.getElementById('exportPosterBtn');
+  var toggleConsoleBtn = document.getElementById('toggleConsoleBtn');
 
   crsSelect.value = currentProjectionId;
 
@@ -549,6 +1509,166 @@ function initPipelineTools(){
   });
 
   fitBtn.addEventListener('click', fitPipelineView);
+
+  drawBuildingAreaBtn.addEventListener('click', toggleBuildingStyleAreaDrawing);
+  saveBuildingAreaBtn.addEventListener('click', finishBuildingStyleAreaDrawing);
+  clearBuildingAreaBtn.addEventListener('click', clearManualBuildingStyleArea);
+  saveStyleConfigBtn.addEventListener('click', function(){
+    saveMapStyleConfig('样式配置已保存到 config/map3d-style.json');
+  });
+  exportPosterBtn.addEventListener('click', exportCurrentPosterView);
+  toggleConsoleBtn.addEventListener('click', function(){
+    var consoleEl = document.getElementById('mapConsole');
+    consoleEl.classList.toggle('collapsed');
+    mapStyleConfig.ui.collapsed = consoleEl.classList.contains('collapsed');
+    updateConsoleToggleState();
+  });
+  document.querySelectorAll('.tab-button').forEach(function(button){
+    button.addEventListener('click', function(){
+      activateConsoleTab(button.getAttribute('data-tab'), false);
+    });
+  });
+  initStyleConfigInputEvents();
+  map.on('click', handleBuildingStyleAreaMapClick);
+  updateStyleConfigInputs();
+  updateBuildingStyleAreaToolState();
+}
+
+function initStyleConfigInputEvents(){
+  [
+    'areaFillColorInput',
+    'areaFillAlphaInput',
+    'areaOutsideFillColorInput',
+    'areaOutsideFillAlphaInput',
+    'areaStrokeColorInput',
+    'areaStrokeAlphaInput',
+    'areaStrokeWeightInput',
+    'buildingRoofColorInput',
+    'buildingRoofAlphaInput',
+    'buildingWallColorInput',
+    'buildingWallAlphaInput',
+    'satelliteLayerZInput',
+    'roadLayerZInput',
+    'outsideMaskLayerZInput',
+    'areaLayerZInput',
+    'modelLayerZInput',
+    'pipelineLayerZInput',
+    'labelLayerZInput',
+    'exportWidthInput',
+    'exportHeightInput',
+    'exportScaleInput',
+    'exportSettleInput',
+    'exportWaitInput',
+    'pipelineColorInput',
+    'pipelineAlphaInput',
+    'pipelineVerticalColorInput',
+    'pipelineVerticalAlphaInput',
+    'pipelineUndergroundColorInput',
+    'pipelineUndergroundAlphaInput',
+    'pipelineRadiusInput',
+    'pipelineVerticalRadiusInput',
+    'pipelineGroundRadiusInput',
+    'pipelineGroundOffsetInput',
+    'valveWidthInput',
+    'valveHeightInput',
+    'valveDedupeInput',
+    'valveShowLabelInput',
+    'valveSymbolColorInput',
+    'valveSymbolAlphaInput',
+    'valveBorderColorInput',
+    'valveBorderAlphaInput',
+    'valveAccentColorInput',
+    'valveAccentAlphaInput'
+  ].forEach(function(id){
+    var input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener('input', applyStyleConfigFromInputs);
+  });
+}
+
+function toggleBuildingStyleAreaDrawing(){
+  if (isDrawingBuildingStyleArea) {
+    cancelBuildingStyleAreaDrawing();
+    return;
+  }
+  isDrawingBuildingStyleArea = true;
+  draftBuildingStyleAreaPath = [];
+  clearBuildingStyleAreaOverlay();
+  updateBuildingStyleAreaToolState();
+  setStatus('正在绘制楼块范围：请在地图上依次点击范围边界点，至少 3 个点后点击“保存范围”。');
+}
+
+function handleBuildingStyleAreaMapClick(event){
+  if (!isDrawingBuildingStyleArea || !event || !event.lnglat) return;
+  var lnglat = event.lnglat;
+  var lng = typeof lnglat.getLng === 'function' ? lnglat.getLng() : lnglat.lng;
+  var lat = typeof lnglat.getLat === 'function' ? lnglat.getLat() : lnglat.lat;
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+  draftBuildingStyleAreaPath.push([lng, lat]);
+  if (draftBuildingStyleAreaPath.length >= BUILDING_STYLE_AREA_MIN_POINTS) {
+    updateBuildingStyleAreaOverlay(draftBuildingStyleAreaPath);
+  }
+  updateBuildingStyleAreaToolState();
+  setStatus('楼块范围已添加 ' + draftBuildingStyleAreaPath.length + ' 个点；至少 3 个点后可保存。');
+}
+
+async function finishBuildingStyleAreaDrawing(){
+  if (!isDrawingBuildingStyleArea || draftBuildingStyleAreaPath.length < BUILDING_STYLE_AREA_MIN_POINTS) {
+    setStatus('楼块范围至少需要 3 个点。');
+    return;
+  }
+  applyStyleConfigFromInputs();
+  mapStyleConfig.area.path = normalizeBuildingStyleAreaPath(draftBuildingStyleAreaPath);
+  savedBuildingStyleAreaPath = mapStyleConfig.area.path;
+  applyBuildingsLayerStyle(savedBuildingStyleAreaPath);
+  if (await saveMapStyleConfig('楼块范围已保存到 config/map3d-style.json，刷新或重启后会自动恢复。')) {
+    isDrawingBuildingStyleArea = false;
+    draftBuildingStyleAreaPath = [];
+    updateBuildingStyleAreaToolState();
+  }
+}
+
+function cancelBuildingStyleAreaDrawing(){
+  isDrawingBuildingStyleArea = false;
+  draftBuildingStyleAreaPath = [];
+  if (savedBuildingStyleAreaPath.length >= BUILDING_STYLE_AREA_MIN_POINTS) {
+    applyBuildingsLayerStyle(savedBuildingStyleAreaPath);
+  } else if (currentProjected) {
+    updateBuildingsLayerStyle(currentProjected);
+  } else {
+    clearBuildingStyleAreaOverlay();
+  }
+  updateBuildingStyleAreaToolState();
+  setStatus('已取消绘制楼块范围。');
+}
+
+async function clearManualBuildingStyleArea(){
+  isDrawingBuildingStyleArea = false;
+  draftBuildingStyleAreaPath = [];
+  applyStyleConfigFromInputs();
+  mapStyleConfig.area.path = [];
+  savedBuildingStyleAreaPath = [];
+  if (currentProjected) {
+    updateBuildingsLayerStyle(currentProjected);
+  } else {
+    clearBuildingStyleAreaOverlay();
+    if (buildingsLayer && typeof buildingsLayer.setStyle === 'function') {
+      buildingsLayer.setStyle({hideWithoutStyle: true, areas: []});
+    }
+  }
+  await saveMapStyleConfig('已清除手动楼块范围并保存，恢复 DXF 自动范围。');
+  updateBuildingStyleAreaToolState();
+}
+
+function updateBuildingStyleAreaToolState(){
+  var drawBuildingAreaBtn = document.getElementById('drawBuildingAreaBtn');
+  var saveBuildingAreaBtn = document.getElementById('saveBuildingAreaBtn');
+  var clearBuildingAreaBtn = document.getElementById('clearBuildingAreaBtn');
+  if (!drawBuildingAreaBtn || !saveBuildingAreaBtn || !clearBuildingAreaBtn) return;
+  drawBuildingAreaBtn.textContent = isDrawingBuildingStyleArea ? '取消绘制' : '绘制楼块范围';
+  saveBuildingAreaBtn.disabled = !isDrawingBuildingStyleArea ||
+    draftBuildingStyleAreaPath.length < BUILDING_STYLE_AREA_MIN_POINTS;
+  clearBuildingAreaBtn.disabled = isDrawingBuildingStyleArea && !savedBuildingStyleAreaPath.length;
 }
 
 async function loadDefaultDxf(){
@@ -1123,7 +2243,7 @@ function drawProjectedFeatures(projected, projectionLabel){
       strokeStyle: 'solid',
       lineJoin: PIPELINE_STYLE.lineJoin,
       lineCap: PIPELINE_STYLE.lineCap,
-      zIndex: PIPELINE_STYLE.zIndexBase
+      zIndex: getLayerZIndex('pipeline')
     }));
   });
 
@@ -1248,7 +2368,7 @@ function createPipeline3DLayer(projected, projectionLabel){
   dxfThreeState = state;
 
   return new AMap.GLCustomLayer({
-    zIndex: PIPELINE_3D_STYLE.zIndex,
+    zIndex: getLayerZIndex('pipeline'),
     init: function(gl){
       state.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 100, 1 << 30);
       state.renderer = new THREE.WebGLRenderer({
@@ -1298,19 +2418,13 @@ function setPipelineReadyStatus(projected, projectionLabel){
 }
 
 function buildPipeline3DScene(state){
-  var material = new THREE.MeshPhongMaterial({
+  var material = new THREE.MeshBasicMaterial({
     color: PIPELINE_3D_STYLE.color,
-    emissive: PIPELINE_3D_STYLE.emissive,
-    shininess: 38,
-    specular: 0xffd49a,
     depthTest: false,
     depthWrite: false
   });
-  var verticalMaterial = new THREE.MeshPhongMaterial({
+  var verticalMaterial = new THREE.MeshBasicMaterial({
     color: PIPELINE_3D_STYLE.verticalColor,
-    emissive: PIPELINE_3D_STYLE.verticalEmissive,
-    shininess: 48,
-    specular: 0xfff0be,
     depthTest: false,
     depthWrite: false
   });
@@ -1321,20 +2435,15 @@ function buildPipeline3DScene(state){
     depthTest: false,
     depthWrite: false
   });
-  var undergroundMaterial = new THREE.MeshPhongMaterial({
+  var undergroundMaterial = new THREE.MeshBasicMaterial({
     color: PIPELINE_3D_STYLE.undergroundColor,
-    emissive: PIPELINE_3D_STYLE.undergroundEmissive,
-    shininess: 18,
-    specular: 0xff6a33,
     transparent: true,
     opacity: PIPELINE_3D_STYLE.undergroundOpacity,
     depthTest: false,
     depthWrite: false
   });
-  var verticalJointMaterial = new THREE.MeshPhongMaterial({
+  var verticalJointMaterial = new THREE.MeshBasicMaterial({
     color: PIPELINE_3D_STYLE.verticalColor,
-    emissive: PIPELINE_3D_STYLE.verticalEmissive,
-    shininess: 42,
     depthTest: false,
     depthWrite: false
   });
@@ -1486,7 +2595,7 @@ function createValveSymbol(valve){
   var rotation = Number.isFinite(valve.rotation) ? valve.rotation : 0;
   return new AMap.Marker({
     position: valve.lnglat,
-    zIndex: VALVE_STYLE.zIndex,
+    zIndex: getLayerZIndex('label'),
     offset: new AMap.Pixel(-VALVE_STYLE.width / 2, -VALVE_STYLE.height),
     title: valve.name || '阀门',
     content: createValveSvg(rotation)
@@ -1524,7 +2633,7 @@ function createValveLabel(valve){
   return new AMap.Text({
     text: valve.name,
     position: valve.lnglat,
-    zIndex: VALVE_STYLE.zIndex + 1,
+    zIndex: getLayerZIndex('label') + 1,
     offset: new AMap.Pixel(10, -16),
     style: {
       padding: '1px 4px',
@@ -1593,7 +2702,13 @@ function hasViewParamsInUrl(){
 }
 
 function setStats(message){
-  document.getElementById('pipelineStats').textContent = message;
+  var summary = document.getElementById('statusSummary');
+  if (summary) summary.textContent = summarizeStats(message);
+}
+
+function summarizeStats(message){
+  if (!message) return '待加载';
+  return String(message).split(' / ').slice(0, 3).join(' / ');
 }
 
 function formatProjectedStats(projected){
@@ -1648,7 +2763,13 @@ function isValidPoint(point){
 }
 
 function setStatus(message){
-  document.getElementById('statusText').textContent = message;
+  var summary = document.getElementById('statusSummary');
+  if (summary) summary.textContent = summarizeStatus(message);
+}
+
+function summarizeStatus(message){
+  var text = String(message || '待加载');
+  return text.length > 48 ? text.slice(0, 48) + '...' : text;
 }
 
 function transformLat(x, y){
