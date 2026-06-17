@@ -227,7 +227,8 @@ var VIEW_PRESET = {
   mapStyle: 'amap://styles/normal'
 };
 var SATELLITE_LAYER_ZINDEX = 1;
-var ROAD_NET_LAYER_ZINDEX = 30;
+var ROAD_NET_LAYER_ZINDEX = 1;
+var BUILDINGS_LAYER_ZINDEX = 10;
 var PIPELINE_STYLE = {
   baseColor: '#382112',
   baseOpacity: 0.72,
@@ -304,6 +305,7 @@ var CRS_DEFS = {
 var map;
 var satelliteLayer;
 var roadNetLayer;
+var buildingsLayer;
 var dxfOverlays = [];
 var dxfValveOverlays = [];
 var dxfThreeLayer = null;
@@ -327,13 +329,14 @@ function mapInit(){
     zooms:[2,20],
     center:INITIAL_VIEW.center,
     showLabel:true,
-    showBuildingBlock:true,
+    showBuildingBlock:false,
     features:['road', 'point', 'building'],
     mapStyle:VIEW_PRESET.mapStyle
   });
 
   addSatelliteImageryLayer();
   addRoadNetLayer();
+  addBuildingsLayer();
 
   if (!POSTER_MODE) {
     var controlBar = new AMap.ControlBar({
@@ -373,6 +376,53 @@ function addRoadNetLayer(){
     zIndex: ROAD_NET_LAYER_ZINDEX
   });
   map.addLayer(roadNetLayer);
+}
+
+function addBuildingsLayer(){
+  // 使用官方 3D 楼块图层，替代地图默认白模。
+  // 这里的构造参数控制整个图层，后面的 setStyle 再覆盖项目范围内的样式。
+  if (!AMap.Buildings) return;
+  buildingsLayer = new AMap.Buildings({
+    // 让楼块位于自定义 Three 管线图层之下，但在底图影像/道路之上。
+    zIndex: BUILDINGS_LAYER_ZINDEX,
+    // 高德楼块在近距离缩放级别下才有意义。
+    zooms: [16, 20],
+    // 1 表示使用官方楼高；只有需要夸张天际线时才调大。
+    heightFactor: 1,
+    // 这些颜色是全局兜底；项目范围内的主要样式由下面的 setStyle 控制。
+    opacity: 1,
+    wallColor: 'rgba(96, 116, 132, 0.85)',
+    roofColor: 'rgba(232, 238, 242, 0.85)'
+  });
+  map.addLayer(buildingsLayer);
+}
+
+function updateBuildingsLayerStyle(projected){
+  // Buildings 的样式只在 path 范围内生效，所以这里用投影后的 DXF 范围
+  // 动态生成样式区域，避免写死某个城市或固定矩形。
+  if (!buildingsLayer || typeof buildingsLayer.setStyle !== 'function' || !projected || !projected.bounds) return;
+  // 加一点经纬度缓冲，让管线范围边缘外的楼块也能保持同一视觉样式。
+  var padding = 0.012;
+  var minLng = projected.bounds.minLng - padding;
+  var minLat = projected.bounds.minLat - padding;
+  var maxLng = projected.bounds.maxLng + padding;
+  var maxLat = projected.bounds.maxLat + padding;
+  buildingsLayer.setStyle({
+    // 样式范围外的楼块仍用图层默认样式显示，不直接隐藏。
+    hideWithoutStyle: false,
+    areas: [{
+      // AMap Buildings 中 color1 通常用于楼顶/上表面，color2 用于墙面/侧面。
+      color1: 'rgba(232, 238, 242, 0.85)',
+      color2: 'rgba(96, 116, 132, 0.85)',
+      // 覆盖当前 DXF 管线范围及其缓冲区的矩形。
+      path: [
+        [minLng, minLat],
+        [maxLng, minLat],
+        [maxLng, maxLat],
+        [minLng, maxLat]
+      ]
+    }]
+  });
 }
 
 function readViewFromUrl(){
@@ -579,6 +629,7 @@ function renderDxfText(dxfText, projectionId){
   document.getElementById('fitPipelineBtn').disabled = false;
   setStats(formatProjectedStats(projected));
   setStatus('正在渲染三维管线，坐标系: ' + projection.label + ' ...');
+  updateBuildingsLayerStyle(projected);
   drawProjectedFeatures(projected, projection.label);
   fitPipelineView();
 }
