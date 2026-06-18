@@ -1,12 +1,26 @@
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+require('dotenv').config();
 const { chromium } = require('playwright');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const STYLE_CONFIG_FILE = path.join(ROOT_DIR, 'config', 'map3d-style.json');
 const REQUESTED_PORT = Number(process.env.PORT || 8765);
 let activePort = REQUESTED_PORT;
+const EXPORT_ACCELERATION_MODES = ['auto', 'gpu', 'software'];
+const EXPORT_ASPECT_RATIOS = ['16:9', '4:3'];
+const DEFAULT_EXPORT_SETTLE = 2000;
+const EXPORT_WARNING_PIXELS = 30000000;
+const EXPORT_MAX_PIXELS = 90000000;
+const DEFAULT_SOURCE_VIEWPORT = {width: 1920, height: 1080};
+let exportBrowser = null;
+let exportBrowserMode = '';
+let exportContext = null;
+let exportContextKey = '';
+let exportInProgress = false;
+let activeServer = null;
+let shuttingDown = false;
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -19,6 +33,34 @@ const CONTENT_TYPES = {
   '.svg': 'image/svg+xml; charset=utf-8',
   '.json': 'application/json; charset=utf-8'
 };
+
+async function createViteDevServer() {
+  const { createServer } = await import('vite');
+  return createServer({
+    configFile: false,
+    root: ROOT_DIR,
+    server: {
+      middlewareMode: true,
+      hmr: false
+    },
+    appType: 'custom'
+  });
+}
+
+async function serveViteHtml(vite, request, response) {
+  try {
+    const htmlPath = path.join(ROOT_DIR, 'map3d.html');
+    const source = await fs.promises.readFile(htmlPath, 'utf8');
+    const html = await vite.transformIndexHtml(request.url, source);
+    response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
+    response.end(html);
+  } catch (error) {
+    vite.ssrFixStacktrace(error);
+    console.error(error);
+    response.writeHead(500);
+    response.end(error.message);
+  }
+}
 
 const DEFAULT_STYLE_CONFIG = {
   area: {
@@ -56,11 +98,13 @@ const DEFAULT_STYLE_CONFIG = {
     projectionId: 'cgcs2000-gk-117'
   },
   export: {
-    width: 3000,
-    height: 1688,
-    scale: 4,
-    settle: 60000,
-    wait: 90000
+    width: 5000,
+    height: 2813,
+    aspectRatio: '16:9',
+    scale: 1,
+    settle: DEFAULT_EXPORT_SETTLE,
+    wait: 90000,
+    acceleration: 'gpu'
   },
   pipeline: {
     color: 'rgba(255, 59, 31, 1)',
@@ -156,11 +200,13 @@ function normalizeStyleConfig(value) {
       projectionId: normalizeText(data.projectionId, DEFAULT_STYLE_CONFIG.data.projectionId, 80)
     },
     export: {
-      width: normalizeInteger(exportConfig.width, DEFAULT_STYLE_CONFIG.export.width, 320, 10000),
-      height: normalizeInteger(exportConfig.height, DEFAULT_STYLE_CONFIG.export.height, 240, 10000),
+      width: normalizeInteger(exportConfig.width, DEFAULT_STYLE_CONFIG.export.width, 320, 12000),
+      height: normalizeExportHeight(exportConfig.width, exportConfig.aspectRatio),
+      aspectRatio: normalizeChoice(exportConfig.aspectRatio, DEFAULT_STYLE_CONFIG.export.aspectRatio, EXPORT_ASPECT_RATIOS),
       scale: normalizeNumber(exportConfig.scale, DEFAULT_STYLE_CONFIG.export.scale, 1, 8),
       settle: normalizeInteger(exportConfig.settle, DEFAULT_STYLE_CONFIG.export.settle, 0, 180000),
-      wait: normalizeInteger(exportConfig.wait, DEFAULT_STYLE_CONFIG.export.wait, 5000, 240000)
+      wait: normalizeInteger(exportConfig.wait, DEFAULT_STYLE_CONFIG.export.wait, 5000, 240000),
+      acceleration: normalizeChoice(exportConfig.acceleration, DEFAULT_STYLE_CONFIG.export.acceleration, EXPORT_ACCELERATION_MODES)
     },
     pipeline: {
       color: normalizeCssColor(pipeline.color, DEFAULT_STYLE_CONFIG.pipeline.color),
@@ -197,6 +243,20 @@ function normalizeNumber(value, fallback, min, max) {
 
 function normalizeInteger(value, fallback, min, max) {
   return Math.round(normalizeNumber(value, fallback, min, max));
+}
+
+function normalizeExportHeight(widthValue, aspectRatioValue) {
+  const width = normalizeInteger(widthValue, DEFAULT_STYLE_CONFIG.export.width, 320, 12000);
+  const aspectRatio = normalizeChoice(aspectRatioValue, DEFAULT_STYLE_CONFIG.export.aspectRatio, EXPORT_ASPECT_RATIOS);
+  return getExportHeightForRatio(width, aspectRatio);
+}
+
+function getExportHeightForRatio(width, aspectRatio) {
+  const normalizedWidth = normalizeInteger(width, DEFAULT_STYLE_CONFIG.export.width, 320, 12000);
+  if (aspectRatio === '4:3') {
+    return normalizeInteger(normalizedWidth * 3 / 4, DEFAULT_STYLE_CONFIG.export.height, 240, 10000);
+  }
+  return normalizeInteger(normalizedWidth * 9 / 16, DEFAULT_STYLE_CONFIG.export.height, 240, 10000);
 }
 
 function normalizeText(value, fallback, maxLength) {
@@ -261,7 +321,8 @@ function buildPosterPath(view) {
   const params = new URLSearchParams();
   params.set('poster', '1');
   if (view && Array.isArray(view.center)) params.set('center', `${view.center[0]},${view.center[1]}`);
-  if (view && Number.isFinite(Number(view.zoom))) params.set('zoom', String(view.zoom));
+  const zoom = view && Number(view.zoom);
+  if (Number.isFinite(zoom)) params.set('zoom', String(zoom));
   if (view && Number.isFinite(Number(view.pitch))) params.set('pitch', String(view.pitch));
   if (view && Number.isFinite(Number(view.rotation))) params.set('rotation', String(view.rotation));
   return `/map3d.html?${params.toString()}`;
@@ -281,54 +342,403 @@ function timestampName() {
   ].join('');
 }
 
-async function exportCurrentView(payload) {
-  const width = Number(payload.width || 1920);
-  const height = Number(payload.height || 1080);
-  const scale = Number(payload.scale || 4);
-  const settle = Number(payload.settle || 60000);
-  const wait = Number(payload.wait || 90000);
-  if (!Number.isFinite(width) || width <= 0) throw new Error('Invalid width');
-  if (!Number.isFinite(height) || height <= 0) throw new Error('Invalid height');
-  if (!Number.isFinite(scale) || scale <= 0) throw new Error('Invalid scale');
+function formatPixelCount(value) {
+  return `${Math.round(value / 1000000)}MP`;
+}
 
-  const relativeFile = `exports/poster-${timestampName()}-${width * scale}x${height * scale}.png`;
+function getExportNumber(payload, key, fallback, min, max, integer) {
+  const raw = payload && payload[key] !== undefined && payload[key] !== '' ? payload[key] : fallback;
+  const number = Number(raw);
+  if (!Number.isFinite(number) || number < min || number > max) {
+    throw new Error(`Invalid ${key}`);
+  }
+  return integer ? Math.round(number) : number;
+}
+
+function getPositiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : NaN;
+}
+
+function firstPositiveNumber(values, fallback) {
+  for (const value of values) {
+    const number = getPositiveNumber(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return fallback;
+}
+
+function normalizeViewportDimension(value, fallback) {
+  const number = Number.isFinite(value) && value > 0 ? value : fallback;
+  return Math.max(1, Math.min(10000, Math.round(number)));
+}
+
+function normalizeSourceViewport(sourceViewport) {
+  const source = sourceViewport && typeof sourceViewport === 'object' ? sourceViewport : {};
+  const container = source.container && typeof source.container === 'object' ? source.container : {};
+  const visualViewport = source.visualViewport && typeof source.visualViewport === 'object' ? source.visualViewport : {};
+  const win = source.window && typeof source.window === 'object' ? source.window : {};
+  const width = normalizeViewportDimension(firstPositiveNumber([
+    source.cssWidth,
+    source.width,
+    source.containerWidth,
+    container.width,
+    source.innerWidth,
+    source.windowWidth,
+    win.innerWidth,
+    visualViewport.width
+  ], DEFAULT_SOURCE_VIEWPORT.width), DEFAULT_SOURCE_VIEWPORT.width);
+  const height = normalizeViewportDimension(firstPositiveNumber([
+    source.cssHeight,
+    source.height,
+    source.containerHeight,
+    container.height,
+    source.innerHeight,
+    source.windowHeight,
+    win.innerHeight,
+    visualViewport.height
+  ], DEFAULT_SOURCE_VIEWPORT.height), DEFAULT_SOURCE_VIEWPORT.height);
+  const devicePixelRatio = firstPositiveNumber([
+    source.devicePixelRatio,
+    source.dpr
+  ], 1);
+  return {
+    width,
+    height,
+    cssWidth: width,
+    cssHeight: height,
+    devicePixelRatio: Number(devicePixelRatio.toFixed(4)),
+    window: {
+      innerWidth: normalizeViewportDimension(firstPositiveNumber([win.innerWidth, source.innerWidth, source.windowWidth], width), width),
+      innerHeight: normalizeViewportDimension(firstPositiveNumber([win.innerHeight, source.innerHeight, source.windowHeight], height), height)
+    },
+    visualViewport: {
+      width: normalizeViewportDimension(firstPositiveNumber([visualViewport.width], width), width),
+      height: normalizeViewportDimension(firstPositiveNumber([visualViewport.height], height), height),
+      scale: Number(firstPositiveNumber([visualViewport.scale], 1).toFixed(4))
+    }
+  };
+}
+
+function getAspectRatioParts(aspectRatio) {
+  if (aspectRatio === '4:3') return {width: 4, height: 3};
+  return {width: 16, height: 9};
+}
+
+function getRenderViewport(sourceViewport, aspectRatio) {
+  const ratio = getAspectRatioParts(aspectRatio);
+  const unit = Math.ceil(Math.max(
+    sourceViewport.width / ratio.width,
+    sourceViewport.height / ratio.height
+  ));
+  return {
+    width: ratio.width * unit,
+    height: ratio.height * unit,
+    strategy: 'expand'
+  };
+}
+
+function getDeviceScaleFactor(pixelWidth, renderViewport) {
+  const factor = pixelWidth / renderViewport.width;
+  if (!Number.isFinite(factor) || factor <= 0) return 1;
+  return Number(factor.toFixed(6));
+}
+
+function readPngSize(filePath) {
+  let fd = null;
+  try {
+    const header = Buffer.alloc(24);
+    fd = fs.openSync(filePath, 'r');
+    fs.readSync(fd, header, 0, header.length, 0);
+    if (
+      header.length < 24 ||
+      header[0] !== 0x89 ||
+      header[1] !== 0x50 ||
+      header[2] !== 0x4e ||
+      header[3] !== 0x47
+    ) {
+      return null;
+    }
+    return {
+      width: header.readUInt32BE(16),
+      height: header.readUInt32BE(20)
+    };
+  } catch (error) {
+    return null;
+  } finally {
+    if (fd !== null) fs.closeSync(fd);
+  }
+}
+
+function normalizeExportPayload(payload) {
+  const width = getExportNumber(payload, 'width', DEFAULT_STYLE_CONFIG.export.width, 320, 12000, true);
+  const aspectRatio = normalizeChoice(
+    payload && payload.aspectRatio,
+    DEFAULT_STYLE_CONFIG.export.aspectRatio,
+    EXPORT_ASPECT_RATIOS
+  );
+  const height = getExportHeightForRatio(width, aspectRatio);
+  const scale = getExportNumber(payload, 'scale', DEFAULT_STYLE_CONFIG.export.scale, 1, 8, false);
+  const settle = getExportNumber(payload, 'settle', DEFAULT_STYLE_CONFIG.export.settle, 0, 180000, true);
+  const wait = getExportNumber(payload, 'wait', DEFAULT_STYLE_CONFIG.export.wait, 5000, 240000, true);
+  const acceleration = normalizeChoice(
+    payload && payload.acceleration,
+    DEFAULT_STYLE_CONFIG.export.acceleration,
+    EXPORT_ACCELERATION_MODES
+  );
+  const pixelWidth = Math.round(width * scale);
+  const pixelHeight = Math.round(height * scale);
+  const pixelCount = pixelWidth * pixelHeight;
+  const sourceViewport = normalizeSourceViewport(payload && payload.sourceViewport);
+  const renderViewport = getRenderViewport(sourceViewport, aspectRatio);
+  const deviceScaleFactor = getDeviceScaleFactor(pixelWidth, renderViewport);
+  if (pixelCount > EXPORT_MAX_PIXELS) {
+    throw new Error(
+      `导出像素 ${formatPixelCount(pixelCount)} 超过安全上限 ${formatPixelCount(EXPORT_MAX_PIXELS)}，请降低宽高或倍率。`
+    );
+  }
+  return {
+    width,
+    height,
+    aspectRatio,
+    scale,
+    settle,
+    wait,
+    acceleration,
+    view: payload && payload.view,
+    sourceViewport,
+    renderViewport,
+    deviceScaleFactor,
+    pixelWidth,
+    pixelHeight,
+    pixelCount,
+    warning: pixelCount > EXPORT_WARNING_PIXELS ?
+      `导出像素 ${formatPixelCount(pixelCount)} 较大，截图编码可能较慢。` :
+      ''
+  };
+}
+
+function getChromiumLaunchOptions(acceleration) {
+  const args = [];
+  if (acceleration === 'gpu') {
+    args.push(
+      '--ignore-gpu-blocklist',
+      '--enable-gpu',
+      '--enable-webgl',
+      '--enable-accelerated-2d-canvas',
+      '--use-angle=d3d11'
+    );
+  }
+  if (acceleration === 'software') {
+    args.push(
+      '--disable-gpu',
+      '--disable-accelerated-2d-canvas',
+      '--use-angle=swiftshader'
+    );
+  }
+  return {headless: true, args};
+}
+
+function isBrowserAlive(browser) {
+  return browser && (typeof browser.isConnected !== 'function' || browser.isConnected());
+}
+
+async function closeExportContext() {
+  if (!exportContext) return;
+  const context = exportContext;
+  exportContext = null;
+  exportContextKey = '';
+  try {
+    await context.close();
+  } catch (error) {
+    console.warn('Failed to close export context', error);
+  }
+}
+
+async function resetExportBrowser() {
+  await closeExportContext();
+  if (!exportBrowser) return;
+  const browser = exportBrowser;
+  exportBrowser = null;
+  exportBrowserMode = '';
+  try {
+    await browser.close();
+  } catch (error) {
+    console.warn('Failed to close export browser', error);
+  }
+}
+
+async function ensureExportBrowser(acceleration) {
+  const startedAt = Date.now();
+  if (isBrowserAlive(exportBrowser) && exportBrowserMode === acceleration) {
+    return {browser: exportBrowser, reused: true, duration: 0};
+  }
+  await resetExportBrowser();
+  exportBrowser = await chromium.launch(getChromiumLaunchOptions(acceleration));
+  exportBrowserMode = acceleration;
+  return {browser: exportBrowser, reused: false, duration: Date.now() - startedAt};
+}
+
+async function ensureExportContext(options, acceleration) {
+  const browserInfo = await ensureExportBrowser(acceleration);
+  const contextKey = [
+    acceleration,
+    options.renderViewport.width,
+    options.renderViewport.height,
+    options.deviceScaleFactor
+  ].join(':');
+  const startedAt = Date.now();
+  if (exportContext && exportContextKey === contextKey) {
+    return {
+      context: exportContext,
+      browserDuration: browserInfo.duration,
+      browserReused: browserInfo.reused,
+      contextDuration: 0,
+      contextReused: true
+    };
+  }
+  await closeExportContext();
+  exportContext = await browserInfo.browser.newContext({
+    viewport: {
+      width: options.renderViewport.width,
+      height: options.renderViewport.height
+    },
+    deviceScaleFactor: options.deviceScaleFactor
+  });
+  exportContextKey = contextKey;
+  return {
+    context: exportContext,
+    browserDuration: browserInfo.duration,
+    browserReused: browserInfo.reused,
+    contextDuration: Date.now() - startedAt,
+    contextReused: false
+  };
+}
+
+async function exportCurrentView(payload) {
+  const options = normalizeExportPayload(payload || {});
+  if (options.acceleration === 'gpu') {
+    let gpuError = null;
+    try {
+      return await runExportSafely(options, 'gpu');
+    } catch (error) {
+      gpuError = error;
+      console.warn('GPU export failed; retrying with auto acceleration.', error);
+    }
+    try {
+      const fallbackResult = await runExportSafely({...options, acceleration: 'auto'}, 'auto');
+      fallbackResult.fallbackFrom = 'gpu';
+      fallbackResult.warning = [
+        options.warning,
+        'GPU 模式失败，已自动使用 auto 模式重试。'
+      ].filter(Boolean).join(' ');
+      return fallbackResult;
+    } catch (fallbackError) {
+      throw new Error(
+        `GPU 模式导出失败: ${gpuError.message}; 自动降级也失败: ${fallbackError.message}`
+      );
+    }
+  }
+  return runExportSafely(options, options.acceleration);
+}
+
+async function runExportSafely(options, acceleration) {
+  try {
+    return await runExportWithMode(options, acceleration);
+  } catch (error) {
+    await resetExportBrowser();
+    throw error;
+  }
+}
+
+async function runExportWithMode(options, acceleration) {
+  const totalStartedAt = Date.now();
+  const metrics = {};
+  const relativeFile = `exports/poster-${timestampName()}-${options.pixelWidth}x${options.pixelHeight}.png`;
   const output = path.join(ROOT_DIR, relativeFile);
   fs.mkdirSync(path.dirname(output), {recursive: true});
 
-  const browser = await chromium.launch({headless: true});
+  const contextInfo = await ensureExportContext(options, acceleration);
+  metrics.browser = contextInfo.browserDuration;
+  metrics.browserReused = contextInfo.browserReused;
+  metrics.context = contextInfo.contextDuration;
+  metrics.contextReused = contextInfo.contextReused;
+
+  let page = null;
   try {
-    const context = await browser.newContext({
-      viewport: {width, height},
-      deviceScaleFactor: scale
-    });
-    const page = await context.newPage();
-    page.setDefaultTimeout(wait);
-    const url = `http://127.0.0.1:${activePort}${buildPosterPath(payload.view)}`;
-    await page.goto(url, {waitUntil: 'domcontentloaded', timeout: wait});
-    await waitForPosterReady(page, wait, settle);
-    await page.screenshot({path: output, fullPage: false, timeout: Math.max(wait, 180000)});
-    return {file: relativeFile.replace(/\//g, path.sep), pixels: [width * scale, height * scale]};
+    const pageStartedAt = Date.now();
+    page = await contextInfo.context.newPage();
+    page.setDefaultTimeout(options.wait);
+    metrics.page = Date.now() - pageStartedAt;
+
+    const url = `http://127.0.0.1:${activePort}${buildPosterPath(options.view)}`;
+    const openStartedAt = Date.now();
+    await page.goto(url, {waitUntil: 'domcontentloaded', timeout: options.wait});
+    metrics.open = Date.now() - openStartedAt;
+
+    const readyStartedAt = Date.now();
+    await waitForPosterReady(page, options.wait, options.settle);
+    metrics.ready = Date.now() - readyStartedAt;
+
+    const screenshotStartedAt = Date.now();
+    await page.screenshot({path: output, fullPage: false, timeout: Math.max(options.wait, 180000)});
+    metrics.screenshot = Date.now() - screenshotStartedAt;
+    metrics.total = Date.now() - totalStartedAt;
+    const screenshotSize = readPngSize(output);
+    const actualPixels = screenshotSize ? [screenshotSize.width, screenshotSize.height] : [options.pixelWidth, options.pixelHeight];
+
+    return {
+      file: relativeFile.replace(/\//g, path.sep),
+      pixels: actualPixels,
+      targetPixels: [options.pixelWidth, options.pixelHeight],
+      pixelCount: options.pixelCount,
+      acceleration,
+      warning: options.warning,
+      sourceViewport: options.sourceViewport,
+      renderViewport: options.renderViewport,
+      deviceScaleFactor: options.deviceScaleFactor,
+      ratioStrategy: options.renderViewport.strategy,
+      timings: metrics
+    };
   } finally {
-    await browser.close();
+    if (page) {
+      try {
+        await page.close();
+      } catch (error) {
+        console.warn('Failed to close export page', error);
+      }
+    }
   }
 }
 
 async function waitForPosterReady(page, wait, settle) {
-  await page.waitForFunction(() => {
-    const status = document.getElementById('statusSummary');
-    return status && status.textContent.indexOf('已加载') !== -1 && window.__PIPELINE_3D_READY !== false;
-  }, {timeout: wait});
+  try {
+    await page.waitForFunction(() => {
+      const readyState = window.__MAP_EXPORT_READY;
+      if (readyState && readyState.ready) return true;
+      const status = document.getElementById('statusSummary');
+      return status && status.textContent.indexOf('已加载') !== -1 && window.__PIPELINE_3D_READY === true;
+    }, {timeout: wait});
+  } catch (error) {
+    const readyState = await page.evaluate(() => window.__MAP_EXPORT_READY || null).catch(() => null);
+    throw new Error(`等待页面导出就绪超时: ${readyState ? JSON.stringify(readyState) : error.message}`);
+  }
 
   try {
-    await page.waitForLoadState('networkidle', {timeout: Math.min(wait, 60000)});
+    await page.waitForLoadState('networkidle', {timeout: Math.min(wait, 5000)});
   } catch (error) {
-    // AMap may keep long-polling or late tile requests alive; the settle wait below is the fallback.
+    // AMap may keep tile requests active; readiness is driven by the page flag above.
   }
 
   if (settle > 0) await page.waitForTimeout(settle);
 }
 
 async function handleExport(request, response) {
+  if (exportInProgress) {
+    sendJson(response, 409, {ok: false, error: '已有高清导出正在进行，请等待当前任务完成。'});
+    return;
+  }
+  exportInProgress = true;
   try {
     const payload = await readRequestJson(request);
     const result = await exportCurrentView(payload);
@@ -336,6 +746,8 @@ async function handleExport(request, response) {
   } catch (error) {
     console.error(error);
     sendJson(response, 500, {ok: false, error: error.message});
+  } finally {
+    exportInProgress = false;
   }
 }
 
@@ -386,7 +798,8 @@ function serveStatic(request, response) {
   });
 }
 
-function createServer() {
+async function createServer() {
+  const vite = await createViteDevServer();
   return http.createServer((request, response) => {
     const requestUrl = new URL(request.url, `http://127.0.0.1:${activePort}`);
     if (request.method === 'POST' && requestUrl.pathname === '/api/export-current-view') {
@@ -401,13 +814,35 @@ function createServer() {
       handleSaveStyleConfig(request, response);
       return;
     }
-    serveStatic(request, response);
+    if (shouldServeRawFile(requestUrl.pathname)) {
+      serveStatic(request, response);
+      return;
+    }
+    if (requestUrl.pathname === '/' || requestUrl.pathname === '/map3d.html') {
+      serveViteHtml(vite, request, response);
+      return;
+    }
+    vite.middlewares(request, response, (error) => {
+      if (error) {
+        console.error(error);
+        response.writeHead(500);
+        response.end(error.message);
+        return;
+      }
+      response.writeHead(404);
+      response.end('Not found');
+    });
   });
 }
 
-function listen(port, attemptsLeft) {
+function shouldServeRawFile(pathname) {
+  return /\.(dxf|png|jpe?g|svg|json)$/i.test(pathname) ||
+    pathname.startsWith('/exports/');
+}
+
+async function listen(port, attemptsLeft) {
   activePort = port;
-  const server = createServer();
+  const server = await createServer();
   server.once('error', (error) => {
     if (error.code === 'EADDRINUSE' && attemptsLeft > 0) {
       listen(port + 1, attemptsLeft - 1);
@@ -416,9 +851,31 @@ function listen(port, attemptsLeft) {
     throw error;
   });
   server.listen(port, '127.0.0.1', () => {
+    activeServer = server;
     console.log(`Open http://127.0.0.1:${port}/map3d.html`);
     console.log('Adjust the map view, then press Ctrl+Shift+E in the page to export.');
   });
 }
 
-listen(REQUESTED_PORT, 20);
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try {
+    await resetExportBrowser();
+  } finally {
+    if (activeServer) {
+      activeServer.close(() => process.exit(0));
+    } else {
+      process.exit(0);
+    }
+  }
+  setTimeout(() => process.exit(0), 1000).unref();
+}
+
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);
+
+listen(REQUESTED_PORT, 20).catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

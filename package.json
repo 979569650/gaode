@@ -2,6 +2,8 @@
   "name": "gaode-poster-map",
   "private": true,
   "scripts": {
+    "build": "vite build",
+    "dev": "vite --host 127.0.0.1",
     "export:poster": "node scripts/export-poster.js",
     "serve": "node scripts/export-server.js"
   },
@@ -9,6 +11,10 @@
     "playwright": "^1.61.0"
   },
   "dependencies": {
-    "three": "^0.142.0"
+    "@amap/amap-jsapi-loader": "^1.0.1",
+    "dotenv": "^17.4.2",
+    "proj4": "^2.20.9",
+    "three": "^0.142.0",
+    "vite": "^8.0.16"
   }
 }
