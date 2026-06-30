@@ -178,17 +178,17 @@
   },
   "ui": {
     "collapsed": false,
-    "activeTab": "area",
+    "activeTab": "advanced",
     "detailsOpen": false
   },
   "view": {
     "center": [
-      117.030667,
-      36.664028
+      117.030978,
+      36.664349
     ],
-    "zoom": 18.29,
-    "pitch": 31.699999999999996,
-    "rotation": 1.2999999999999998
+    "zoom": 18.27,
+    "pitch": 35.9,
+    "rotation": 0.5
   },
   "data": {
     "projectionId": "cgcs2000-gk-117"
@@ -204,6 +204,9 @@
   },
   "pipeline": {
     "color": "rgba(255, 59, 31, 1.00)",
+    "mediumColor": "rgba(255, 59, 31, 1.00)",
+    "lowColor": "rgba(42, 184, 93, 1.00)",
+    "unknownColor": "rgba(128, 136, 145, 1.00)",
     "verticalColor": "rgba(255, 106, 0, 1.00)",
     "undergroundColor": "rgba(255, 59, 31, 0.46)",
     "radius": 0.38,
@@ -216,8 +219,11 @@
     "height": 38,
     "dedupePixelDistance": 28,
     "showLabel": false,
-    "symbolColor": "rgba(234, 122, 27, 1.00)",
-    "borderColor": "rgba(56, 33, 18, 1.00)",
+    "symbolColor": "rgba(29, 108, 255, 1.00)",
+    "electricColor": "rgba(29, 108, 255, 1.00)",
+    "weldedColor": "rgba(47, 128, 237, 1.00)",
+    "regulatorColor": "rgba(124, 58, 237, 1.00)",
+    "borderColor": "rgba(18, 52, 92, 1.00)",
     "accentColor": "rgba(255, 207, 122, 1.00)"
   }
 }

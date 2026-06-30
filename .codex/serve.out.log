@@ -1,0 +1,7 @@
+
+> serve
+> node scripts/export-server.js
+
+◇ injected env (3) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+Open http://127.0.0.1:8966/map3d.html
+Adjust the map view, then press Ctrl+Shift+E in the page to export.

@@ -102,6 +102,9 @@ var DEFAULT_MAP_STYLE_CONFIG = {
   },
   pipeline: {
     color: 'rgba(255, 59, 31, 1)',
+    mediumColor: 'rgba(255, 59, 31, 1)',
+    lowColor: 'rgba(42, 184, 93, 1)',
+    unknownColor: 'rgba(128, 136, 145, 1)',
     verticalColor: 'rgba(255, 106, 0, 1)',
     undergroundColor: 'rgba(255, 59, 31, 0.46)',
     radius: 0.38,
@@ -114,8 +117,11 @@ var DEFAULT_MAP_STYLE_CONFIG = {
     height: 38,
     dedupePixelDistance: 28,
     showLabel: false,
-    symbolColor: '#ea7a1b',
-    borderColor: '#382112',
+    symbolColor: '#1d6cff',
+    electricColor: '#1d6cff',
+    weldedColor: '#2f80ed',
+    regulatorColor: '#7c3aed',
+    borderColor: '#12345c',
     accentColor: '#ffcf7a'
   }
 };
@@ -156,6 +162,9 @@ var PIPELINE_3D_STYLE = {
   verticalRadius: 0.55,
   radialSegments: 12,
   color: 0xff3b1f,
+  mediumColor: 0xff3b1f,
+  lowColor: 0x2ab85d,
+  unknownColor: 0x808891,
   undergroundColor: 0xff3b1f,
   verticalColor: 0xff6a00,
   verticalHaloColor: 0xffb000,
@@ -175,11 +184,14 @@ var PIPELINE_3D_STYLE = {
   zIndex: PIPELINE_LAYER_ZINDEX
 };
 var VALVE_STYLE = {
-  symbolColor: '#ea7a1b',
-  borderColor: '#382112',
+  symbolColor: '#1d6cff',
+  electricColor: '#1d6cff',
+  weldedColor: '#2f80ed',
+  regulatorColor: '#7c3aed',
+  borderColor: '#12345c',
   accentColor: '#ffcf7a',
-  poleColor: 'rgba(56, 33, 18, 0.72)',
-  textColor: '#6e3a12',
+  poleColor: 'rgba(18, 52, 92, 0.72)',
+  textColor: '#12345c',
   haloColor: 'rgba(247, 238, 218, 0.86)',
   width: 28,
   height: 38,
@@ -188,6 +200,19 @@ var VALVE_STYLE = {
   showLabel: false
 };
 var VALVE_KEYWORDS = ['阀门', '阀'];
+var REGULATOR_KEYWORDS = ['调压柜', '调压器', '调压'];
+var PIPELINE_PRESSURE_LABEL_MAX_DISTANCE = 18;
+var PIPELINE_CATEGORY = {
+  medium: 'medium',
+  low: 'low',
+  unknown: 'unknown'
+};
+var FACILITY_KIND = {
+  electricValve: 'electricValve',
+  weldedValve: 'weldedValve',
+  valve: 'valve',
+  regulator: 'regulator'
+};
 var DXF_TEXT_ENCODINGS = ['gb18030', 'gbk', 'utf-8'];
 var SEGMENT_MERGE_TOLERANCE = 0.8;
 var CRS_DEFS = {
@@ -729,6 +754,9 @@ function normalizeMapStyleConfig(config){
     },
     pipeline: {
       color: normalizeCssColor(source.pipeline && source.pipeline.color, DEFAULT_MAP_STYLE_CONFIG.pipeline.color),
+      mediumColor: normalizeCssColor(source.pipeline && source.pipeline.mediumColor, source.pipeline && source.pipeline.color || DEFAULT_MAP_STYLE_CONFIG.pipeline.mediumColor),
+      lowColor: normalizeCssColor(source.pipeline && source.pipeline.lowColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.lowColor),
+      unknownColor: normalizeCssColor(source.pipeline && source.pipeline.unknownColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.unknownColor),
       verticalColor: normalizeCssColor(source.pipeline && source.pipeline.verticalColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.verticalColor),
       undergroundColor: normalizeCssColor(source.pipeline && source.pipeline.undergroundColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.undergroundColor),
       radius: normalizeNumber(source.pipeline && source.pipeline.radius, DEFAULT_MAP_STYLE_CONFIG.pipeline.radius, 0.05, 5),
@@ -742,6 +770,9 @@ function normalizeMapStyleConfig(config){
       dedupePixelDistance: normalizeInteger(source.valves && source.valves.dedupePixelDistance, DEFAULT_MAP_STYLE_CONFIG.valves.dedupePixelDistance, 0, 120),
       showLabel: Boolean(source.valves && source.valves.showLabel),
       symbolColor: normalizeCssColor(source.valves && source.valves.symbolColor, DEFAULT_MAP_STYLE_CONFIG.valves.symbolColor),
+      electricColor: normalizeCssColor(source.valves && source.valves.electricColor, source.valves && source.valves.symbolColor || DEFAULT_MAP_STYLE_CONFIG.valves.electricColor),
+      weldedColor: normalizeCssColor(source.valves && source.valves.weldedColor, DEFAULT_MAP_STYLE_CONFIG.valves.weldedColor),
+      regulatorColor: normalizeCssColor(source.valves && source.valves.regulatorColor, DEFAULT_MAP_STYLE_CONFIG.valves.regulatorColor),
       borderColor: normalizeCssColor(source.valves && source.valves.borderColor, DEFAULT_MAP_STYLE_CONFIG.valves.borderColor),
       accentColor: normalizeCssColor(source.valves && source.valves.accentColor, DEFAULT_MAP_STYLE_CONFIG.valves.accentColor)
     }
@@ -878,9 +909,9 @@ function applyRuntimeStyleConfig(){
 
 function applyPipelineConfig(){
   PIPELINE_3D_STYLE.color = cssColorToNumber(mapStyleConfig.pipeline.color, DEFAULT_MAP_STYLE_CONFIG.pipeline.color);
-  PIPELINE_3D_STYLE.verticalColor = cssColorToNumber(mapStyleConfig.pipeline.verticalColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.verticalColor);
-  PIPELINE_3D_STYLE.undergroundColor = cssColorToNumber(mapStyleConfig.pipeline.undergroundColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.undergroundColor);
-  PIPELINE_3D_STYLE.undergroundOpacity = parseCssColor(mapStyleConfig.pipeline.undergroundColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.undergroundColor).alpha;
+  PIPELINE_3D_STYLE.mediumColor = cssColorToNumber(mapStyleConfig.pipeline.mediumColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.mediumColor);
+  PIPELINE_3D_STYLE.lowColor = cssColorToNumber(mapStyleConfig.pipeline.lowColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.lowColor);
+  PIPELINE_3D_STYLE.unknownColor = cssColorToNumber(mapStyleConfig.pipeline.unknownColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.unknownColor);
   PIPELINE_3D_STYLE.radius = mapStyleConfig.pipeline.radius;
   PIPELINE_3D_STYLE.verticalRadius = mapStyleConfig.pipeline.verticalRadius;
   PIPELINE_3D_STYLE.groundSearchRadius = mapStyleConfig.pipeline.groundSearchRadius;
@@ -893,6 +924,9 @@ function applyValveConfig(){
   VALVE_STYLE.dedupePixelDistance = mapStyleConfig.valves.dedupePixelDistance;
   VALVE_STYLE.showLabel = mapStyleConfig.valves.showLabel;
   VALVE_STYLE.symbolColor = mapStyleConfig.valves.symbolColor;
+  VALVE_STYLE.electricColor = mapStyleConfig.valves.electricColor;
+  VALVE_STYLE.weldedColor = mapStyleConfig.valves.weldedColor;
+  VALVE_STYLE.regulatorColor = mapStyleConfig.valves.regulatorColor;
   VALVE_STYLE.borderColor = mapStyleConfig.valves.borderColor;
   VALVE_STYLE.accentColor = mapStyleConfig.valves.accentColor;
   if (currentProjected && window.__PIPELINE_3D_READY) renderValveOverlays(currentProjected);
@@ -920,9 +954,9 @@ function updateStyleConfigInputs(){
   setInputValue('exportSettleInput', String(mapStyleConfig.export.settle));
   setInputValue('exportWaitInput', String(mapStyleConfig.export.wait));
   setInputValue('exportAccelerationInput', mapStyleConfig.export.acceleration);
-  setColorControl('pipelineColorInput', 'pipelineAlphaInput', mapStyleConfig.pipeline.color, DEFAULT_MAP_STYLE_CONFIG.pipeline.color);
-  setColorControl('pipelineVerticalColorInput', 'pipelineVerticalAlphaInput', mapStyleConfig.pipeline.verticalColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.verticalColor);
-  setColorControl('pipelineUndergroundColorInput', 'pipelineUndergroundAlphaInput', mapStyleConfig.pipeline.undergroundColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.undergroundColor);
+  setColorControl('pipelineMediumColorInput', 'pipelineMediumAlphaInput', mapStyleConfig.pipeline.mediumColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.mediumColor);
+  setColorControl('pipelineLowColorInput', 'pipelineLowAlphaInput', mapStyleConfig.pipeline.lowColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.lowColor);
+  setColorControl('pipelineUnknownColorInput', 'pipelineUnknownAlphaInput', mapStyleConfig.pipeline.unknownColor, DEFAULT_MAP_STYLE_CONFIG.pipeline.unknownColor);
   setInputValue('pipelineRadiusInput', String(mapStyleConfig.pipeline.radius));
   setInputValue('pipelineVerticalRadiusInput', String(mapStyleConfig.pipeline.verticalRadius));
   setInputValue('pipelineGroundRadiusInput', String(mapStyleConfig.pipeline.groundSearchRadius));
@@ -932,6 +966,9 @@ function updateStyleConfigInputs(){
   setInputValue('valveDedupeInput', String(mapStyleConfig.valves.dedupePixelDistance));
   setInputValue('valveShowLabelInput', String(mapStyleConfig.valves.showLabel));
   setColorControl('valveSymbolColorInput', 'valveSymbolAlphaInput', mapStyleConfig.valves.symbolColor, DEFAULT_MAP_STYLE_CONFIG.valves.symbolColor);
+  setColorControl('valveElectricColorInput', 'valveElectricAlphaInput', mapStyleConfig.valves.electricColor, DEFAULT_MAP_STYLE_CONFIG.valves.electricColor);
+  setColorControl('valveWeldedColorInput', 'valveWeldedAlphaInput', mapStyleConfig.valves.weldedColor, DEFAULT_MAP_STYLE_CONFIG.valves.weldedColor);
+  setColorControl('regulatorColorInput', 'regulatorAlphaInput', mapStyleConfig.valves.regulatorColor, DEFAULT_MAP_STYLE_CONFIG.valves.regulatorColor);
   setColorControl('valveBorderColorInput', 'valveBorderAlphaInput', mapStyleConfig.valves.borderColor, DEFAULT_MAP_STYLE_CONFIG.valves.borderColor);
   setColorControl('valveAccentColorInput', 'valveAccentAlphaInput', mapStyleConfig.valves.accentColor, DEFAULT_MAP_STYLE_CONFIG.valves.accentColor);
   updateExportControlsState();
@@ -977,9 +1014,12 @@ function applyStyleConfigFromInputs(){
       acceleration: getInputValue('exportAccelerationInput', mapStyleConfig.export.acceleration)
     },
     pipeline: {
-      color: getColorControlValue('pipelineColorInput', 'pipelineAlphaInput', DEFAULT_MAP_STYLE_CONFIG.pipeline.color),
-      verticalColor: getColorControlValue('pipelineVerticalColorInput', 'pipelineVerticalAlphaInput', DEFAULT_MAP_STYLE_CONFIG.pipeline.verticalColor),
-      undergroundColor: getColorControlValue('pipelineUndergroundColorInput', 'pipelineUndergroundAlphaInput', DEFAULT_MAP_STYLE_CONFIG.pipeline.undergroundColor),
+      color: mapStyleConfig.pipeline.color,
+      mediumColor: getColorControlValue('pipelineMediumColorInput', 'pipelineMediumAlphaInput', DEFAULT_MAP_STYLE_CONFIG.pipeline.mediumColor),
+      lowColor: getColorControlValue('pipelineLowColorInput', 'pipelineLowAlphaInput', DEFAULT_MAP_STYLE_CONFIG.pipeline.lowColor),
+      unknownColor: getColorControlValue('pipelineUnknownColorInput', 'pipelineUnknownAlphaInput', DEFAULT_MAP_STYLE_CONFIG.pipeline.unknownColor),
+      verticalColor: mapStyleConfig.pipeline.verticalColor,
+      undergroundColor: mapStyleConfig.pipeline.undergroundColor,
       radius: getInputValue('pipelineRadiusInput', mapStyleConfig.pipeline.radius),
       verticalRadius: getInputValue('pipelineVerticalRadiusInput', mapStyleConfig.pipeline.verticalRadius),
       groundSearchRadius: getInputValue('pipelineGroundRadiusInput', mapStyleConfig.pipeline.groundSearchRadius),
@@ -991,6 +1031,9 @@ function applyStyleConfigFromInputs(){
       dedupePixelDistance: getInputValue('valveDedupeInput', mapStyleConfig.valves.dedupePixelDistance),
       showLabel: getInputValue('valveShowLabelInput', String(mapStyleConfig.valves.showLabel)) === 'true',
       symbolColor: getColorControlValue('valveSymbolColorInput', 'valveSymbolAlphaInput', DEFAULT_MAP_STYLE_CONFIG.valves.symbolColor),
+      electricColor: getColorControlValue('valveElectricColorInput', 'valveElectricAlphaInput', DEFAULT_MAP_STYLE_CONFIG.valves.electricColor),
+      weldedColor: getColorControlValue('valveWeldedColorInput', 'valveWeldedAlphaInput', DEFAULT_MAP_STYLE_CONFIG.valves.weldedColor),
+      regulatorColor: getColorControlValue('regulatorColorInput', 'regulatorAlphaInput', DEFAULT_MAP_STYLE_CONFIG.valves.regulatorColor),
       borderColor: getColorControlValue('valveBorderColorInput', 'valveBorderAlphaInput', DEFAULT_MAP_STYLE_CONFIG.valves.borderColor),
       accentColor: getColorControlValue('valveAccentColorInput', 'valveAccentAlphaInput', DEFAULT_MAP_STYLE_CONFIG.valves.accentColor)
     }
@@ -1371,12 +1414,12 @@ function initStyleConfigInputEvents(){
     'exportSettleInput',
     'exportWaitInput',
     'exportAccelerationInput',
-    'pipelineColorInput',
-    'pipelineAlphaInput',
-    'pipelineVerticalColorInput',
-    'pipelineVerticalAlphaInput',
-    'pipelineUndergroundColorInput',
-    'pipelineUndergroundAlphaInput',
+    'pipelineMediumColorInput',
+    'pipelineMediumAlphaInput',
+    'pipelineLowColorInput',
+    'pipelineLowAlphaInput',
+    'pipelineUnknownColorInput',
+    'pipelineUnknownAlphaInput',
     'pipelineRadiusInput',
     'pipelineVerticalRadiusInput',
     'pipelineGroundRadiusInput',
@@ -1387,6 +1430,12 @@ function initStyleConfigInputEvents(){
     'valveShowLabelInput',
     'valveSymbolColorInput',
     'valveSymbolAlphaInput',
+    'valveElectricColorInput',
+    'valveElectricAlphaInput',
+    'valveWeldedColorInput',
+    'valveWeldedAlphaInput',
+    'regulatorColorInput',
+    'regulatorAlphaInput',
     'valveBorderColorInput',
     'valveBorderAlphaInput',
     'valveAccentColorInput',
@@ -1573,10 +1622,11 @@ function renderDxfText(dxfText, projectionId){
 function getProjectedDxf(dxfText, projectionId){
   if (dxfProcessingCache.text !== dxfText) {
     var parsed = parseDxf(dxfText);
+    var classifiedFeatures = classifyPipelineFeatures(parsed.features, parsed.texts);
     dxfProcessingCache = {
       text: dxfText,
       parsed: parsed,
-      mergedFeatures: mergeLinearFeatures(parsed.features, SEGMENT_MERGE_TOLERANCE),
+      mergedFeatures: mergeLinearFeatures(classifiedFeatures, SEGMENT_MERGE_TOLERANCE),
       projectedByKey: {}
     };
   }
@@ -1613,6 +1663,7 @@ function parseDxf(dxfText){
 
   var features = [];
   var inserts = [];
+  var texts = [];
   var inEntities = false;
   var entity = null;
   var polylineBuffer = null;
@@ -1630,7 +1681,7 @@ function parseDxf(dxfText){
     if (!inEntities) continue;
 
     if (pair.code === '0' && pair.value === 'ENDSEC') {
-      finalizeOpenEntities(features, inserts, entity, polylineBuffer);
+      finalizeOpenEntities(features, inserts, texts, entity, polylineBuffer);
       break;
     }
 
@@ -1649,14 +1700,14 @@ function parseDxf(dxfText){
           if (polylineBuffer.closed) {
             closePoints(polylineBuffer.points);
           }
-          features.push(makeFeature(polylineBuffer.layer, polylineBuffer.points, 'POLYLINE'));
+          features.push(makeFeature(polylineBuffer.layer, polylineBuffer.points, 'POLYLINE', {}));
         }
         polylineBuffer = null;
         continue;
       }
 
       if (entity) {
-        pushFeatureFromEntity(features, inserts, entity);
+        pushFeatureFromEntity(features, inserts, texts, entity);
       }
 
       entity = {
@@ -1693,19 +1744,20 @@ function parseDxf(dxfText){
 
   return {
     features: features,
-    inserts: inserts
+    inserts: inserts,
+    texts: texts
   };
 }
 
-function finalizeOpenEntities(features, inserts, entity, polylineBuffer){
+function finalizeOpenEntities(features, inserts, texts, entity, polylineBuffer){
   if (entity) {
-    pushFeatureFromEntity(features, inserts, entity);
+    pushFeatureFromEntity(features, inserts, texts, entity);
   }
   if (polylineBuffer && polylineBuffer.points.length >= 2) {
     if (polylineBuffer.closed) {
       closePoints(polylineBuffer.points);
     }
-    features.push(makeFeature(polylineBuffer.layer, polylineBuffer.points, 'POLYLINE'));
+    features.push(makeFeature(polylineBuffer.layer, polylineBuffer.points, 'POLYLINE', {}));
   }
 }
 
@@ -1735,7 +1787,7 @@ function consumeVertexEntity(pairs, startIndex){
   };
 }
 
-function pushFeatureFromEntity(features, inserts, entity){
+function pushFeatureFromEntity(features, inserts, texts, entity){
   var type = entity.type;
   if (type === 'LINE' || type === 'TRLINE') {
     var linePoints = [
@@ -1743,7 +1795,9 @@ function pushFeatureFromEntity(features, inserts, entity){
       makePoint(firstNumber(entity.data['11']), firstNumber(entity.data['21']), firstNumber(entity.data['31']))
     ];
     if (isValidPoint(linePoints[0]) && isValidPoint(linePoints[1])) {
-      features.push(makeFeature(firstValue(entity.data['8']), linePoints, type));
+      features.push(makeFeature(firstValue(entity.data['8']), linePoints, type, {
+        endpointIds: getEntityEndpointIds(entity.data)
+      }));
     }
     return;
   }
@@ -1755,7 +1809,23 @@ function pushFeatureFromEntity(features, inserts, entity){
         layer: firstValue(entity.data['8']) || '0',
         name: firstValue(entity.data['2']) || '',
         rotation: firstNumber(entity.data['50']) || 0,
-        point: insertPoint
+        point: insertPoint,
+        refs: getXDataPairs(entity.data)
+      });
+    }
+    return;
+  }
+
+  if (type === 'TEXT' || type === 'MTEXT') {
+    var textPoint = makePoint(firstNumber(entity.data['10']), firstNumber(entity.data['20']), firstNumber(entity.data['30']));
+    var value = firstValue(entity.data['1']);
+    if (value && isValidPoint(textPoint)) {
+      texts.push({
+        layer: firstValue(entity.data['8']) || '0',
+        text: value,
+        rotation: firstNumber(entity.data['50']) || 0,
+        point: textPoint,
+        refs: getXDataPairs(entity.data)
       });
     }
     return;
@@ -1778,18 +1848,106 @@ function pushFeatureFromEntity(features, inserts, entity){
       if ((flags & 1) === 1) {
         closePoints(points);
       }
-      features.push(makeFeature(firstValue(entity.data['8']), points, type));
+      features.push(makeFeature(firstValue(entity.data['8']), points, type, {}));
     }
   }
 }
 
-function makeFeature(layerName, points, type){
+function makeFeature(layerName, points, type, metadata){
+  var meta = metadata || {};
   return {
     layer: layerName || '0',
     type: type,
     points: points,
-    closed: isClosedPath(points)
+    closed: isClosedPath(points),
+    category: meta.category || PIPELINE_CATEGORY.unknown,
+    label: meta.label || '',
+    endpointIds: meta.endpointIds || []
   };
+}
+
+function getEntityEndpointIds(data){
+  return getXDataPairs(data).filter(function(pair){
+    return pair.key === '起始点号' || pair.key === '终止点号';
+  }).map(function(pair){
+    return pair.value;
+  }).filter(Boolean);
+}
+
+function getXDataPairs(data){
+  var keys = data['1001'] || [];
+  var values = data['1000'] || [];
+  var pairs = [];
+  for (var i = 0; i < Math.min(keys.length, values.length); i += 1) {
+    pairs.push({key: keys[i], value: values[i]});
+  }
+  return pairs;
+}
+
+function classifyPipelineFeatures(features, texts){
+  var labels = (texts || []).map(parsePipelineTextLabel).filter(Boolean);
+  return features.map(function(feature){
+    var label = findNearestPipelineLabel(feature, labels);
+    if (!label) return cloneFeature(feature);
+    var classified = cloneFeature(feature);
+    classified.category = label.category;
+    classified.label = label.text;
+    return classified;
+  });
+}
+
+function parsePipelineTextLabel(textEntity){
+  if (!textEntity || !textEntity.text) return null;
+  var text = normalizeDxfText(textEntity.text);
+  var category = getPipelineCategoryFromText(text);
+  if (category === PIPELINE_CATEGORY.unknown) return null;
+  return {
+    text: text,
+    category: category,
+    point: textEntity.point
+  };
+}
+
+function normalizeDxfText(text){
+  return String(text || '').replace(/%%C/gi, 'Φ').replace(/\s+/g, ' ').trim();
+}
+
+function getPipelineCategoryFromText(text){
+  if (String(text).indexOf('中压') !== -1) return PIPELINE_CATEGORY.medium;
+  if (String(text).indexOf('低压') !== -1) return PIPELINE_CATEGORY.low;
+  return PIPELINE_CATEGORY.unknown;
+}
+
+function findNearestPipelineLabel(feature, labels){
+  if (!labels.length || !feature.points || feature.points.length < 2) return null;
+  var best = null;
+  var bestDistance = Infinity;
+  labels.forEach(function(label){
+    for (var i = 1; i < feature.points.length; i += 1) {
+      var distance = distancePointToSegment2d(label.point, feature.points[i - 1], feature.points[i]);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = label;
+      }
+    }
+  });
+  return bestDistance <= PIPELINE_PRESSURE_LABEL_MAX_DISTANCE ? best : null;
+}
+
+function distancePointToSegment2d(point, start, end){
+  if (!point || !start || !end) return Infinity;
+  var vx = end[0] - start[0];
+  var vy = end[1] - start[1];
+  var wx = point[0] - start[0];
+  var wy = point[1] - start[1];
+  var lengthSquared = vx * vx + vy * vy;
+  var t = lengthSquared <= 0.000001 ? 0 : (wx * vx + wy * vy) / lengthSquared;
+  t = Math.max(0, Math.min(1, t));
+  var closestX = start[0] + vx * t;
+  var closestY = start[1] + vy * t;
+  var dx = point[0] - closestX;
+  var dy = point[1] - closestY;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 function isClosedPath(points){
@@ -1817,7 +1975,7 @@ function mergeLinearFeatures(features, tolerance){
       merged.push(feature);
       return;
     }
-    var groupKey = feature.layer + '|' + feature.type;
+    var groupKey = feature.layer + '|' + feature.type + '|' + (feature.category || PIPELINE_CATEGORY.unknown);
     if (!grouped[groupKey]) grouped[groupKey] = [];
     grouped[groupKey].push(cloneFeature(feature));
   });
@@ -1852,7 +2010,10 @@ function cloneFeature(feature){
     layer: feature.layer,
     type: feature.type,
     closed: feature.closed,
-    points: feature.points.map(function(point){ return makePoint(point[0], point[1], point[2]); })
+    points: feature.points.map(function(point){ return makePoint(point[0], point[1], point[2]); }),
+    category: feature.category || PIPELINE_CATEGORY.unknown,
+    label: feature.label || '',
+    endpointIds: (feature.endpointIds || []).slice()
   };
 }
 
@@ -1882,7 +2043,10 @@ function mergedFeature(baseFeature, suffixPoints){
     layer: baseFeature.layer,
     type: baseFeature.type,
     closed: false,
-    points: baseFeature.points.concat(suffixPoints)
+    points: baseFeature.points.concat(suffixPoints),
+    category: baseFeature.category || PIPELINE_CATEGORY.unknown,
+    label: baseFeature.label || '',
+    endpointIds: (baseFeature.endpointIds || []).slice()
   };
 }
 
@@ -1901,6 +2065,17 @@ function pointsNear(a, b, tolerance){
 function projectFeatures(features, inserts, projectionId){
   var projectedFeatures = [];
   var projectedValves = [];
+  var categoryCounts = {
+    medium: 0,
+    low: 0,
+    unknown: 0
+  };
+  var facilityCounts = {
+    electricValve: 0,
+    weldedValve: 0,
+    valve: 0,
+    regulator: 0
+  };
   var minZ = Infinity;
   var maxZ = -Infinity;
   var verticalSegments = 0;
@@ -1946,21 +2121,29 @@ function projectFeatures(features, inserts, projectionId){
       projectedFeatures.push({
         layer: feature.layer,
         type: feature.type,
+        category: feature.category || PIPELINE_CATEGORY.unknown,
+        label: feature.label || '',
+        endpointIds: feature.endpointIds || [],
         path: path
       });
+      categoryCounts[feature.category || PIPELINE_CATEGORY.unknown] += 1;
     }
   });
 
   inserts.forEach(function(insert){
-    if (!isValveInsert(insert)) return;
+    var facility = getFacilityKind(insert);
+    if (!facility) return;
     var z = normalizeZ(insert.point[2]);
     var lnglat = projectedPointToGcj(insert.point, projectionId);
     if (!lnglat) return;
     minZ = Math.min(minZ, z);
     maxZ = Math.max(maxZ, z);
+    facilityCounts[facility.kind] += 1;
     projectedValves.push({
       layer: insert.layer,
       name: insert.name,
+      kind: facility.kind,
+      label: facility.label,
       rotation: insert.rotation,
       lnglat: lnglat,
       z: z
@@ -2013,6 +2196,8 @@ function projectFeatures(features, inserts, projectionId){
     features: projectedFeatures,
     valves: projectedValves,
     visibleValveCount: projectedValves.length,
+    categoryCounts: categoryCounts,
+    facilityCounts: facilityCounts,
     zRange: {
       min: minZ,
       max: maxZ,
@@ -2088,6 +2273,24 @@ function isValveInsert(insert){
   return VALVE_KEYWORDS.some(function(keyword){
     return insert.name.indexOf(keyword) !== -1;
   });
+}
+
+function getFacilityKind(insert){
+  var name = insert && insert.name ? insert.name : '';
+  if (!name) return null;
+  if (name.indexOf('电磁阀') !== -1) {
+    return {kind: FACILITY_KIND.electricValve, label: '电磁阀'};
+  }
+  if (name.indexOf('焊接阀门') !== -1) {
+    return {kind: FACILITY_KIND.weldedValve, label: '焊接阀门'};
+  }
+  if (REGULATOR_KEYWORDS.some(function(keyword){ return name.indexOf(keyword) !== -1; })) {
+    return {kind: FACILITY_KIND.regulator, label: '调压柜'};
+  }
+  if (isValveInsert(insert)) {
+    return {kind: FACILITY_KIND.valve, label: '阀门'};
+  }
+  return null;
 }
 
 function projectedPointToGcj(point, projectionId){
@@ -2340,11 +2543,7 @@ function setPipelineReadyStatus(projected, projectionLabel){
 }
 
 function buildPipeline3DScene(state){
-  var material = new THREE.MeshBasicMaterial({
-    color: PIPELINE_3D_STYLE.color,
-    depthTest: false,
-    depthWrite: false
-  });
+  var pipelineMaterials = createPipelineMaterials();
   var verticalMaterial = new THREE.MeshBasicMaterial({
     color: PIPELINE_3D_STYLE.verticalColor,
     depthTest: false,
@@ -2354,13 +2553,6 @@ function buildPipeline3DScene(state){
     color: PIPELINE_3D_STYLE.verticalHaloColor,
     transparent: true,
     opacity: 0.34,
-    depthTest: false,
-    depthWrite: false
-  });
-  var undergroundMaterial = new THREE.MeshBasicMaterial({
-    color: PIPELINE_3D_STYLE.undergroundColor,
-    transparent: true,
-    opacity: PIPELINE_3D_STYLE.undergroundOpacity,
     depthTest: false,
     depthWrite: false
   });
@@ -2380,17 +2572,18 @@ function buildPipeline3DScene(state){
   var jointGeometry = new THREE.SphereGeometry(PIPELINE_3D_STYLE.jointRadius, PIPELINE_3D_STYLE.radialSegments, 8);
 
   state.projected.features.forEach(function(feature){
+    var materialSet = getPipelineMaterialSet(pipelineMaterials, feature.category);
     var coords = state.customCoords.lngLatsToCoords(feature.path.map(pointToLngLat));
     for (var i = 1; i < feature.path.length; i += 1) {
       addStyledPipelineSegment(
         state.scene,
         segmentGeometry,
         jointGeometry,
-        material,
-        verticalMaterial,
+        materialSet.surface,
+        materialSet.surface,
         verticalHaloMaterial,
-        undergroundMaterial,
-        verticalJointMaterial,
+        materialSet.underground,
+        materialSet.surface,
         coords[i - 1],
         coords[i],
         feature.path[i - 1],
@@ -2398,6 +2591,33 @@ function buildPipeline3DScene(state){
       );
     }
   });
+}
+
+function createPipelineMaterials(){
+  return {
+    medium: createPipelineMaterialSet(PIPELINE_3D_STYLE.mediumColor),
+    low: createPipelineMaterialSet(PIPELINE_3D_STYLE.lowColor),
+    unknown: createPipelineMaterialSet(PIPELINE_3D_STYLE.unknownColor)
+  };
+}
+
+function createPipelineMaterialSet(color){
+  return {
+    surface: new THREE.MeshBasicMaterial({
+      color: color,
+      depthTest: false,
+      depthWrite: false
+    }),
+    underground: new THREE.MeshBasicMaterial({
+      color: color,
+      depthTest: false,
+      depthWrite: false
+    })
+  };
+}
+
+function getPipelineMaterialSet(materials, category){
+  return materials[category] || materials.unknown;
 }
 
 function addStyledPipelineSegment(scene, segmentGeometry, jointGeometry, material, verticalMaterial, verticalHaloMaterial, undergroundMaterial, verticalJointMaterial, startCoord, endCoord, startPoint, endPoint){
@@ -2428,17 +2648,6 @@ function addStyledPipelineSegment(scene, segmentGeometry, jointGeometry, materia
 }
 
 function addAboveGroundPipeSegment(scene, segmentGeometry, material, verticalMaterial, verticalHaloMaterial, verticalJointMaterial, jointGeometry, start, end, vertical){
-  if (vertical) {
-    addPipeSegment(
-      scene,
-      segmentGeometry,
-      verticalHaloMaterial,
-      start,
-      end,
-      PIPELINE_3D_STYLE.verticalHaloRadius,
-      9
-    );
-  }
   addPipeSegment(
     scene,
     segmentGeometry,
@@ -2519,13 +2728,36 @@ function createValveSymbol(valve){
     position: valve.lnglat,
     zIndex: getLayerZIndex('label'),
     offset: new AMap.Pixel(-VALVE_STYLE.width / 2, -VALVE_STYLE.height),
-    title: valve.name || '阀门',
-    content: createValveSvg(rotation)
+    title: (valve.label || valve.name || '设施') + (valve.name && valve.name !== valve.label ? '：' + valve.name : ''),
+    content: createFacilitySvg(valve, rotation)
   });
 }
 
-function createValveSvg(rotation){
+function createFacilitySvg(facility, rotation){
+  if (facility && facility.kind === FACILITY_KIND.regulator) {
+    return createRegulatorSvg();
+  }
+  return createValveSvg(rotation, getFacilityColor(facility), facility && facility.kind);
+}
+
+function getFacilityColor(facility){
+  if (!facility) return VALVE_STYLE.symbolColor;
+  if (facility.kind === FACILITY_KIND.electricValve) return VALVE_STYLE.electricColor;
+  if (facility.kind === FACILITY_KIND.weldedValve) return VALVE_STYLE.weldedColor;
+  if (facility.kind === FACILITY_KIND.regulator) return VALVE_STYLE.regulatorColor;
+  return VALVE_STYLE.symbolColor;
+}
+
+function createValveSvg(rotation, symbolColor, kind){
   var symbolRotation = Number.isFinite(rotation) ? rotation : 0;
+  var glyph = kind === FACILITY_KIND.electricValve ?
+    '<path d="M20.5 9 L13.8 22 H19 L16.6 31 L25.2 17.4 H19.6 Z" fill="#fff7e4" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.2" stroke-linejoin="round"/>' :
+    [
+      '<path d="M9.5 13.5 L18.4 20 L9.5 26.5 Z" fill="#fff7e4" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.4" stroke-linejoin="round"/>',
+      '<path d="M28.5 13.5 L19.6 20 L28.5 26.5 Z" fill="#fff7e4" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.4" stroke-linejoin="round"/>',
+      '<circle cx="19" cy="20" r="2.6" fill="' + VALVE_STYLE.accentColor + '" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.2"/>',
+      '<path d="M19 11.2 V28.8" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.4" stroke-linecap="round"/>'
+    ].join('');
   return [
     '<div style="width:' + VALVE_STYLE.width + 'px;height:' + VALVE_STYLE.height + 'px;transform:translateY(-2px);">',
       '<svg width="' + VALVE_STYLE.width + '" height="' + VALVE_STYLE.height + '" viewBox="0 0 38 52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">',
@@ -2537,14 +2769,32 @@ function createValveSvg(rotation){
         '<g filter="url(#valveShadow)">',
           '<path d="M19 50 L14.5 38 H23.5 Z" fill="' + VALVE_STYLE.borderColor + '" opacity="0.82"/>',
           '<path d="M19 42 V30" stroke="' + VALVE_STYLE.poleColor + '" stroke-width="3" stroke-linecap="round"/>',
-          '<circle cx="19" cy="20" r="16" fill="' + VALVE_STYLE.symbolColor + '" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="2"/>',
+          '<circle cx="19" cy="20" r="16" fill="' + symbolColor + '" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="2"/>',
           '<circle cx="19" cy="20" r="12" fill="rgba(255,246,226,0.18)" stroke="rgba(255,255,255,0.72)" stroke-width="1"/>',
           '<g transform="rotate(' + symbolRotation + ' 19 20)">',
-            '<path d="M9.5 13.5 L18.4 20 L9.5 26.5 Z" fill="#fff7e4" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.4" stroke-linejoin="round"/>',
-            '<path d="M28.5 13.5 L19.6 20 L28.5 26.5 Z" fill="#fff7e4" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.4" stroke-linejoin="round"/>',
-            '<circle cx="19" cy="20" r="2.6" fill="' + VALVE_STYLE.accentColor + '" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.2"/>',
-            '<path d="M19 11.2 V28.8" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.4" stroke-linecap="round"/>',
+            glyph,
           '</g>',
+        '</g>',
+      '</svg>',
+    '</div>'
+  ].join('');
+}
+
+function createRegulatorSvg(){
+  return [
+    '<div style="width:' + VALVE_STYLE.width + 'px;height:' + VALVE_STYLE.height + 'px;transform:translateY(-2px);">',
+      '<svg width="' + VALVE_STYLE.width + '" height="' + VALVE_STYLE.height + '" viewBox="0 0 38 52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">',
+        '<defs>',
+          '<filter id="regulatorShadow" x="-40%" y="-30%" width="180%" height="180%">',
+            '<feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="rgba(35,21,9,0.38)"/>',
+          '</filter>',
+        '</defs>',
+        '<g filter="url(#regulatorShadow)">',
+          '<path d="M19 50 L14.5 38 H23.5 Z" fill="' + VALVE_STYLE.borderColor + '" opacity="0.82"/>',
+          '<rect x="8" y="9" width="22" height="28" rx="3" fill="' + VALVE_STYLE.regulatorColor + '" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="2"/>',
+          '<rect x="12" y="14" width="14" height="8" rx="1.5" fill="rgba(255,255,255,0.22)" stroke="rgba(255,255,255,0.65)" stroke-width="1"/>',
+          '<path d="M13 28 H25 M13 32 H25" stroke="#fff7e4" stroke-width="2" stroke-linecap="round"/>',
+          '<circle cx="19" cy="24.8" r="2.4" fill="' + VALVE_STYLE.accentColor + '" stroke="' + VALVE_STYLE.borderColor + '" stroke-width="1.1"/>',
         '</g>',
       '</svg>',
     '</div>'
@@ -2553,7 +2803,7 @@ function createValveSvg(rotation){
 
 function createValveLabel(valve){
   return new AMap.Text({
-    text: valve.name,
+    text: valve.label || valve.name,
     position: valve.lnglat,
     zIndex: getLayerZIndex('label') + 1,
     offset: new AMap.Pixel(10, -16),
@@ -2635,10 +2885,18 @@ function summarizeStats(message){
 }
 
 function formatProjectedStats(projected){
+  var categories = projected.categoryCounts || {};
+  var facilities = projected.facilityCounts || {};
   return [
     projected.features.length + ' 条管线',
-    projected.valves.length + ' 个阀门',
-    '显示阀门 ' + projected.visibleValveCount + ' 个',
+    '中压 ' + (categories.medium || 0) + ' 条',
+    '低压 ' + (categories.low || 0) + ' 条',
+    '未分类 ' + (categories.unknown || 0) + ' 条',
+    projected.valves.length + ' 个设施',
+    '电磁阀 ' + (facilities.electricValve || 0),
+    '焊接阀门 ' + (facilities.weldedValve || 0),
+    '调压柜 ' + (facilities.regulator || 0),
+    '显示设施 ' + projected.visibleValveCount + ' 个',
     '实际高差 ' + projected.zRange.delta.toFixed(2) + 'm',
     '局部地面半径 ' + projected.groundSearchRadius.toFixed(2) + 'm',
     '相对地面 ' + projected.relativeGroundRange.min.toFixed(2) + '~' + projected.relativeGroundRange.max.toFixed(2) + 'm',

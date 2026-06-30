@@ -106,9 +106,9 @@ if (IS_POSTER_MODE) {
     <section class="tab-panel" data-panel="advanced">
       <div class="section-title">管线</div>
       <div class="control-grid">
-        <label class="control-field">管线颜色<span class="color-row"><input id="pipelineColorInput" type="color"><input id="pipelineAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
-        <label class="control-field">竖管颜色<span class="color-row"><input id="pipelineVerticalColorInput" type="color"><input id="pipelineVerticalAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
-        <label class="control-field">地下颜色<span class="color-row"><input id="pipelineUndergroundColorInput" type="color"><input id="pipelineUndergroundAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">中压颜色<span class="color-row"><input id="pipelineMediumColorInput" type="color"><input id="pipelineMediumAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">低压颜色<span class="color-row"><input id="pipelineLowColorInput" type="color"><input id="pipelineLowAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">未分类颜色<span class="color-row"><input id="pipelineUnknownColorInput" type="color"><input id="pipelineUnknownAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
         <label class="control-field">管线粗细<input id="pipelineRadiusInput" type="number" min="0.05" max="5" step="0.01"></label>
         <label class="control-field">竖管粗细<input id="pipelineVerticalRadiusInput" type="number" min="0.05" max="5" step="0.01"></label>
         <label class="control-field">地面半径<input id="pipelineGroundRadiusInput" type="number" min="0" max="5" step="0.05"></label>
@@ -121,6 +121,9 @@ if (IS_POSTER_MODE) {
         <label class="control-field">聚合距离<input id="valveDedupeInput" type="number" min="0" max="120" step="1"></label>
         <label class="control-field">显示文字<select id="valveShowLabelInput"><option value="false">否</option><option value="true">是</option></select></label>
         <label class="control-field">阀门主色<span class="color-row"><input id="valveSymbolColorInput" type="color"><input id="valveSymbolAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">电磁阀<span class="color-row"><input id="valveElectricColorInput" type="color"><input id="valveElectricAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">焊接阀门<span class="color-row"><input id="valveWeldedColorInput" type="color"><input id="valveWeldedAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
+        <label class="control-field">调压柜<span class="color-row"><input id="regulatorColorInput" type="color"><input id="regulatorAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
         <label class="control-field">阀门边框<span class="color-row"><input id="valveBorderColorInput" type="color"><input id="valveBorderAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
         <label class="control-field">阀门强调<span class="color-row"><input id="valveAccentColorInput" type="color"><input id="valveAccentAlphaInput" type="range" min="0" max="1" step="0.01"></span></label>
       </div>
@@ -130,20 +133,23 @@ if (IS_POSTER_MODE) {
 <div class="poster-caption" aria-hidden="true">
   <div class="poster-title">宽厚里燃气管线总览</div>
   <div class="poster-legend">
-    <span class="legend-item"><span class="legend-line"></span><span>燃气管线</span></span>
+    <span class="legend-item"><span class="legend-line legend-line-medium"></span><span>中压管线</span></span>
+    <span class="legend-item"><span class="legend-line legend-line-low"></span><span>低压管线</span></span>
+    <span class="legend-item"><span class="legend-line legend-line-unknown"></span><span>未分类管线</span></span>
     <span class="legend-item">
       <svg class="legend-valve" viewBox="0 0 38 52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M19 50 L14.5 38 H23.5 Z" fill="#382112" opacity="0.82"/>
-        <path d="M19 42 V30" stroke="rgba(56,33,18,0.72)" stroke-width="3" stroke-linecap="round"/>
-        <circle cx="19" cy="20" r="16" fill="#ea7a1b" stroke="#382112" stroke-width="2"/>
+        <path d="M19 50 L14.5 38 H23.5 Z" fill="#12345c" opacity="0.82"/>
+        <path d="M19 42 V30" stroke="rgba(18,52,92,0.72)" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="19" cy="20" r="16" fill="#1d6cff" stroke="#12345c" stroke-width="2"/>
         <circle cx="19" cy="20" r="12" fill="rgba(255,246,226,0.18)" stroke="rgba(255,255,255,0.72)" stroke-width="1"/>
-        <path d="M9.5 13.5 L18.4 20 L9.5 26.5 Z" fill="#fff7e4" stroke="#382112" stroke-width="1.4" stroke-linejoin="round"/>
-        <path d="M28.5 13.5 L19.6 20 L28.5 26.5 Z" fill="#fff7e4" stroke="#382112" stroke-width="1.4" stroke-linejoin="round"/>
-        <circle cx="19" cy="20" r="2.6" fill="#ffcf7a" stroke="#382112" stroke-width="1.2"/>
-        <path d="M19 11.2 V28.8" stroke="#382112" stroke-width="1.4" stroke-linecap="round"/>
+        <path d="M9.5 13.5 L18.4 20 L9.5 26.5 Z" fill="#fff7e4" stroke="#12345c" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M28.5 13.5 L19.6 20 L28.5 26.5 Z" fill="#fff7e4" stroke="#12345c" stroke-width="1.4" stroke-linejoin="round"/>
+        <circle cx="19" cy="20" r="2.6" fill="#ffcf7a" stroke="#12345c" stroke-width="1.2"/>
+        <path d="M19 11.2 V28.8" stroke="#12345c" stroke-width="1.4" stroke-linecap="round"/>
       </svg>
       <span>阀门</span>
     </span>
+    <span class="legend-item"><span class="legend-regulator"></span><span>调压柜</span></span>
   </div>
 </div>
 <script type="module" src="/src/main.js"></script>

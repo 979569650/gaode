@@ -54,6 +54,7 @@ html.poster-mode .poster-caption{
 .poster-legend{
   display:flex;
   align-items:center;
+  flex-wrap:wrap;
   gap:18px;
   padding-bottom:3px;
   color:#4a4133;
@@ -73,10 +74,45 @@ html.poster-mode .poster-caption{
   border-top:5px solid #ff3b1f;
   box-shadow:0 0 0 2px rgba(255,246,226,0.84);
 }
+.legend-line-medium{
+  border-top-color:#ff3b1f;
+}
+.legend-line-low{
+  border-top-color:#2ab85d;
+}
+.legend-line-unknown{
+  border-top-color:#808891;
+}
 .legend-valve{
   width:22px;
   height:28px;
   display:inline-block;
+}
+.legend-regulator{
+  width:18px;
+  height:22px;
+  display:inline-block;
+  border:2px solid #12345c;
+  border-radius:4px;
+  background:#7c3aed;
+  box-shadow:0 0 0 2px rgba(255,246,226,0.84);
+  position:relative;
+}
+.legend-regulator::before,
+.legend-regulator::after{
+  content:"";
+  position:absolute;
+  left:4px;
+  right:4px;
+  height:2px;
+  background:#fff7e4;
+  border-radius:999px;
+}
+.legend-regulator::before{
+  top:8px;
+}
+.legend-regulator::after{
+  top:13px;
 }
 @media (max-width: 900px){
   html.poster-mode .poster-caption{

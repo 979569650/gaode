@@ -108,6 +108,9 @@ const DEFAULT_STYLE_CONFIG = {
   },
   pipeline: {
     color: 'rgba(255, 59, 31, 1)',
+    mediumColor: 'rgba(255, 59, 31, 1)',
+    lowColor: 'rgba(42, 184, 93, 1)',
+    unknownColor: 'rgba(128, 136, 145, 1)',
     verticalColor: 'rgba(255, 106, 0, 1)',
     undergroundColor: 'rgba(255, 59, 31, 0.46)',
     radius: 0.38,
@@ -120,8 +123,11 @@ const DEFAULT_STYLE_CONFIG = {
     height: 38,
     dedupePixelDistance: 28,
     showLabel: false,
-    symbolColor: '#ea7a1b',
-    borderColor: '#382112',
+    symbolColor: '#1d6cff',
+    electricColor: '#1d6cff',
+    weldedColor: '#2f80ed',
+    regulatorColor: '#7c3aed',
+    borderColor: '#12345c',
     accentColor: '#ffcf7a'
   }
 };
@@ -210,6 +216,9 @@ function normalizeStyleConfig(value) {
     },
     pipeline: {
       color: normalizeCssColor(pipeline.color, DEFAULT_STYLE_CONFIG.pipeline.color),
+      mediumColor: normalizeCssColor(pipeline.mediumColor, pipeline.color || DEFAULT_STYLE_CONFIG.pipeline.mediumColor),
+      lowColor: normalizeCssColor(pipeline.lowColor, DEFAULT_STYLE_CONFIG.pipeline.lowColor),
+      unknownColor: normalizeCssColor(pipeline.unknownColor, DEFAULT_STYLE_CONFIG.pipeline.unknownColor),
       verticalColor: normalizeCssColor(pipeline.verticalColor, DEFAULT_STYLE_CONFIG.pipeline.verticalColor),
       undergroundColor: normalizeCssColor(pipeline.undergroundColor, DEFAULT_STYLE_CONFIG.pipeline.undergroundColor),
       radius: normalizeNumber(pipeline.radius, DEFAULT_STYLE_CONFIG.pipeline.radius, 0.05, 5),
@@ -223,6 +232,9 @@ function normalizeStyleConfig(value) {
       dedupePixelDistance: normalizeInteger(valves.dedupePixelDistance, DEFAULT_STYLE_CONFIG.valves.dedupePixelDistance, 0, 120),
       showLabel: Boolean(valves.showLabel),
       symbolColor: normalizeCssColor(valves.symbolColor, DEFAULT_STYLE_CONFIG.valves.symbolColor),
+      electricColor: normalizeCssColor(valves.electricColor, valves.symbolColor || DEFAULT_STYLE_CONFIG.valves.electricColor),
+      weldedColor: normalizeCssColor(valves.weldedColor, DEFAULT_STYLE_CONFIG.valves.weldedColor),
+      regulatorColor: normalizeCssColor(valves.regulatorColor, DEFAULT_STYLE_CONFIG.valves.regulatorColor),
       borderColor: normalizeCssColor(valves.borderColor, DEFAULT_STYLE_CONFIG.valves.borderColor),
       accentColor: normalizeCssColor(valves.accentColor, DEFAULT_STYLE_CONFIG.valves.accentColor)
     }
