@@ -1,5 +1,6 @@
 const fs = require('fs');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 require('dotenv').config();
 const { chromium } = require('playwright');
@@ -7,6 +8,12 @@ const { chromium } = require('playwright');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const STYLE_CONFIG_FILE = path.join(ROOT_DIR, 'config', 'map3d-style.json');
 const REQUESTED_PORT = Number(process.env.PORT || 8765);
+const REQUESTED_HOST = process.env.HOST || '127.0.0.1';
+const HTTPS_PFX_FILE = process.env.HTTPS_PFX_FILE ? path.resolve(ROOT_DIR, process.env.HTTPS_PFX_FILE) : '';
+const HTTPS_PFX_PASSPHRASE = process.env.HTTPS_PFX_PASSPHRASE || '';
+const HTTPS_CA_CERT_FILE = process.env.HTTPS_CA_CERT_FILE ? path.resolve(ROOT_DIR, process.env.HTTPS_CA_CERT_FILE) : '';
+const CERT_HELPER_PORT = Number(process.env.CERT_HELPER_PORT || 0);
+const ACTIVE_PROTOCOL = HTTPS_PFX_FILE ? 'https' : 'http';
 let activePort = REQUESTED_PORT;
 const EXPORT_ACCELERATION_MODES = ['auto', 'gpu', 'software'];
 const EXPORT_ASPECT_RATIOS = ['16:9', '4:3'];
@@ -20,6 +27,7 @@ let exportContext = null;
 let exportContextKey = '';
 let exportInProgress = false;
 let activeServer = null;
+let certHelperServer = null;
 let shuttingDown = false;
 
 const CONTENT_TYPES = {
@@ -47,9 +55,9 @@ async function createViteDevServer() {
   });
 }
 
-async function serveViteHtml(vite, request, response) {
+async function serveViteHtml(vite, request, response, htmlFile) {
   try {
-    const htmlPath = path.join(ROOT_DIR, 'map3d.html');
+    const htmlPath = path.join(ROOT_DIR, htmlFile || 'map3d.html');
     const source = await fs.promises.readFile(htmlPath, 'utf8');
     const html = await vite.transformIndexHtml(request.url, source);
     response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
@@ -615,7 +623,8 @@ async function ensureExportContext(options, acceleration) {
       width: options.renderViewport.width,
       height: options.renderViewport.height
     },
-    deviceScaleFactor: options.deviceScaleFactor
+    deviceScaleFactor: options.deviceScaleFactor,
+    ignoreHTTPSErrors: true
   });
   exportContextKey = contextKey;
   return {
@@ -683,7 +692,7 @@ async function runExportWithMode(options, acceleration) {
     page.setDefaultTimeout(options.wait);
     metrics.page = Date.now() - pageStartedAt;
 
-    const url = `http://127.0.0.1:${activePort}${buildPosterPath(options.view)}`;
+    const url = `${ACTIVE_PROTOCOL}://127.0.0.1:${activePort}${buildPosterPath(options.view)}`;
     const openStartedAt = Date.now();
     await page.goto(url, {waitUntil: 'domcontentloaded', timeout: options.wait});
     metrics.open = Date.now() - openStartedAt;
@@ -812,7 +821,7 @@ function serveStatic(request, response) {
 
 async function createServer() {
   const vite = await createViteDevServer();
-  return http.createServer((request, response) => {
+  const requestHandler = (request, response) => {
     const requestUrl = new URL(request.url, `http://127.0.0.1:${activePort}`);
     if (request.method === 'POST' && requestUrl.pathname === '/api/export-current-view') {
       handleExport(request, response);
@@ -831,7 +840,11 @@ async function createServer() {
       return;
     }
     if (requestUrl.pathname === '/' || requestUrl.pathname === '/map3d.html') {
-      serveViteHtml(vite, request, response);
+      serveViteHtml(vite, request, response, 'map3d.html');
+      return;
+    }
+    if (requestUrl.pathname === '/navigation.html') {
+      serveViteHtml(vite, request, response, 'navigation.html');
       return;
     }
     vite.middlewares(request, response, (error) => {
@@ -844,7 +857,12 @@ async function createServer() {
       response.writeHead(404);
       response.end('Not found');
     });
-  });
+  };
+  if (!HTTPS_PFX_FILE) return http.createServer(requestHandler);
+  return https.createServer({
+    pfx: fs.readFileSync(HTTPS_PFX_FILE),
+    passphrase: HTTPS_PFX_PASSPHRASE
+  }, requestHandler);
 }
 
 function shouldServeRawFile(pathname) {
@@ -862,17 +880,67 @@ async function listen(port, attemptsLeft) {
     }
     throw error;
   });
-  server.listen(port, '127.0.0.1', () => {
+  server.listen(port, REQUESTED_HOST, () => {
     activeServer = server;
-    console.log(`Open http://127.0.0.1:${port}/map3d.html`);
+    const displayHost = REQUESTED_HOST === '0.0.0.0' ? '127.0.0.1' : REQUESTED_HOST;
+    console.log(`Open ${ACTIVE_PROTOCOL}://${displayHost}:${port}/map3d.html`);
+    if (REQUESTED_HOST === '0.0.0.0') {
+      console.log(`LAN access is enabled on port ${port}. Use this computer's LAN IPv4 address from your phone.`);
+    }
+    startCertificateHelperServer(port);
     console.log('Adjust the map view, then press Ctrl+Shift+E in the page to export.');
   });
+}
+
+function startCertificateHelperServer(mainPort) {
+  if (!HTTPS_CA_CERT_FILE || !CERT_HELPER_PORT || certHelperServer) return;
+  certHelperServer = http.createServer((request, response) => {
+    const requestUrl = new URL(request.url, `http://127.0.0.1:${CERT_HELPER_PORT}`);
+    if (requestUrl.pathname === '/gaode-local-root-ca.cer') {
+      fs.readFile(HTTPS_CA_CERT_FILE, (error, data) => {
+        if (error) {
+          response.writeHead(404);
+          response.end('Certificate not found');
+          return;
+        }
+        response.writeHead(200, {
+          'Content-Type': 'application/x-x509-ca-cert',
+          'Content-Disposition': 'attachment; filename="gaode-local-root-ca.cer"',
+          'Cache-Control': 'no-store'
+        });
+        response.end(data);
+      });
+      return;
+    }
+    response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store'});
+    response.end([
+      '<!doctype html><meta charset="utf-8"><title>Gaode Local HTTPS Certificate</title>',
+      '<body style="font-family:system-ui,sans-serif;line-height:1.6;padding:24px">',
+      '<h1>Gaode Local HTTPS Certificate</h1>',
+      '<p>Install this root certificate on your phone, then open the HTTPS navigation page.</p>',
+      '<p><a href="/gaode-local-root-ca.cer">Download root CA certificate</a></p>',
+      '<p>Navigation URL: <code>https://' + getLanDisplayHost() + ':' + mainPort + '/navigation.html</code></p>',
+      '</body>'
+    ].join(''));
+  });
+  certHelperServer.listen(CERT_HELPER_PORT, REQUESTED_HOST, () => {
+    const displayHost = REQUESTED_HOST === '0.0.0.0' ? getLanDisplayHost() : REQUESTED_HOST;
+    console.log(`Certificate helper: http://${displayHost}:${CERT_HELPER_PORT}/`);
+  });
+}
+
+function getLanDisplayHost() {
+  return process.env.LAN_HOST || '127.0.0.1';
 }
 
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   try {
+    if (certHelperServer) {
+      certHelperServer.close();
+      certHelperServer = null;
+    }
     await resetExportBrowser();
   } finally {
     if (activeServer) {

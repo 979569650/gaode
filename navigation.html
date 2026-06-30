@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width initial-scale=1.0 maximum-scale=1.0 user-scalable=0">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link rel="icon" href="data:,">
+<title>设施导航</title>
+<script>
+window.IS_NAVIGATION_MODE = true;
+</script>
+</head>
+<body>
+<div id="container" style="width:100%; height:100%;resize:both;"></div>
+<div id="navigationConsole" class="map-console navigation-console">
+  <div class="console-head">
+    <div>
+      <div class="console-title">设施导航</div>
+    </div>
+    <button id="toggleNavigationConsoleBtn" class="console-toggle" type="button" title="收起面板" aria-label="收起面板">‹</button>
+  </div>
+  <div id="statusSummary" class="visually-hidden" aria-hidden="true">待加载</div>
+  <div class="console-actions">
+    <button id="loadDxfBtn" type="button">重载数据</button>
+    <button id="fitPipelineBtn" type="button" disabled>定位管线</button>
+    <a class="console-action-link" href="/map3d.html">返回出图页</a>
+  </div>
+  <div class="console-body">
+    <section class="navigation-panel">
+      <div class="section-title">目标设施</div>
+      <div id="navigationTargetInfo" class="navigation-card muted">点击地图上的阀门或调压柜选择终点。</div>
+      <div class="section-title">起点</div>
+      <div id="navigationOriginInfo" class="navigation-card muted">尚未设置起点。</div>
+      <div class="control-grid">
+        <button id="locateNavigationOriginBtn" type="button">使用当前位置</button>
+        <button id="pickNavigationOriginBtn" type="button">地图点选起点</button>
+      </div>
+      <div class="section-title">路线</div>
+      <div class="control-grid">
+        <button id="planNavigationRouteBtn" type="button" disabled>开始步行路线</button>
+        <button id="clearNavigationRouteBtn" type="button">清除路线</button>
+      </div>
+      <a id="openAmapNavigationLink" class="navigation-link disabled" href="#" target="_blank" rel="noopener">打开高德导航</a>
+      <div id="navigationStatus" class="field-hint">请选择终点并设置起点。</div>
+      <div id="navigationSummary" class="navigation-card muted">暂无路线。</div>
+      <div class="section-title">实时导航</div>
+      <div id="navigationLiveInfo" class="navigation-card muted">路线生成后可开始实时跟踪。</div>
+      <div class="control-grid">
+        <button id="startNavigationTrackingBtn" type="button" disabled>开始实时跟踪</button>
+        <button id="stopNavigationTrackingBtn" type="button" disabled>停止跟踪</button>
+      </div>
+      <div class="control-grid navigation-options">
+        <label class="navigation-option"><input id="navigationVoiceInput" type="checkbox" checked><span>语音播报</span></label>
+        <button id="testNavigationVoiceBtn" type="button">测试播报</button>
+      </div>
+      <div id="navigationRealtimeStatus" class="field-hint">等待路线。</div>
+      <div id="navigationSteps" class="navigation-steps"></div>
+    </section>
+  </div>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

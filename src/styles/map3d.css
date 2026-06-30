@@ -187,9 +187,13 @@ html.poster-mode .poster-caption{
   padding:10px 14px;
   border-bottom:1px solid rgba(214,225,235,0.08);
 }
+.navigation-console{
+  width:min(420px, calc(100vw - 28px));
+}
 .map-console button,
 .map-console select,
-.map-console input{
+.map-console input,
+.console-action-link{
   height:32px;
   min-width:0;
   border:1px solid rgba(219,228,237,0.13);
@@ -204,17 +208,29 @@ html.poster-mode .poster-caption{
   padding:0 10px;
   cursor:pointer;
 }
+.console-action-link{
+  box-sizing:border-box;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:0 10px;
+  color:#e6edf3;
+  text-decoration:none;
+}
 .map-console button:hover,
 .map-console select:hover,
-.map-console input:hover{
+.map-console input:hover,
+.console-action-link:hover{
   border-color:rgba(255,136,70,0.58);
   background:rgba(255,255,255,0.085);
 }
 .map-console button:focus-visible,
 .map-console select:focus-visible,
-.map-console input:focus-visible{
+.map-console input:focus-visible,
+.console-action-link:focus-visible{
   border-color:rgba(255,136,70,0.86);
   box-shadow:0 0 0 2px rgba(255,107,43,0.18);
+  outline:none;
 }
 .map-console button:disabled{
   cursor:not-allowed;
@@ -292,6 +308,125 @@ html.poster-mode .poster-caption{
 }
 .field-hint.danger{
   color:#ff9a86;
+}
+.navigation-card{
+  padding:9px 10px;
+  color:#edf4fb;
+  background:rgba(255,255,255,0.055);
+  border:1px solid rgba(219,228,237,0.12);
+  border-radius:5px;
+  font-size:11px;
+  line-height:17px;
+  overflow-wrap:anywhere;
+}
+.navigation-card.muted{
+  color:#aab5bf;
+  background:rgba(255,255,255,0.035);
+}
+.navigation-link{
+  display:block;
+  box-sizing:border-box;
+  height:32px;
+  margin-top:10px;
+  padding:7px 10px 0;
+  border:1px solid rgba(91,151,255,0.58);
+  border-radius:5px;
+  color:#eaf2ff;
+  background:rgba(52,115,230,0.18);
+  text-align:center;
+  text-decoration:none;
+  font-size:12px;
+  line-height:16px;
+  transition:border-color .16s ease, background .16s ease, color .16s ease;
+}
+.navigation-link:hover{
+  border-color:rgba(116,170,255,0.86);
+  background:rgba(52,115,230,0.26);
+}
+.navigation-link.disabled{
+  pointer-events:none;
+  color:#7e8994;
+  border-color:rgba(219,228,237,0.1);
+  background:rgba(255,255,255,0.03);
+}
+.navigation-steps{
+  margin-top:10px;
+  max-height:220px;
+  overflow:auto;
+  color:#d8e3ed;
+  font-size:11px;
+  line-height:16px;
+}
+.navigation-steps .amap-lib-walking{
+  background:transparent;
+  border:0;
+  color:#d8e3ed;
+}
+.navigation-steps .amap-lib-walking *{
+  max-width:100%;
+  color:inherit;
+  font-size:11px;
+  line-height:16px;
+}
+.navigation-steps .amap-lib-walking .planTitle,
+.navigation-steps .amap-lib-walking .planTitle:hover,
+.navigation-steps .amap-lib-walking .plan dt{
+  background:rgba(255,255,255,0.055);
+  border-color:rgba(219,228,237,0.1);
+}
+.navigation-steps:empty{
+  display:none;
+}
+.navigation-options{
+  margin-top:10px;
+  align-items:center;
+}
+.navigation-option{
+  height:32px;
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 10px;
+  color:#d8e3ed;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(219,228,237,0.12);
+  border-radius:5px;
+  font-size:12px;
+}
+.navigation-option input{
+  width:14px!important;
+  height:14px!important;
+  accent-color:#4f8cff;
+}
+.navigation-origin-marker{
+  width:18px;
+  height:18px;
+  box-sizing:border-box;
+  border:2px solid #ffffff;
+  border-radius:50%;
+  background:#1d6cff;
+  box-shadow:0 0 0 3px rgba(29,108,255,0.22), 0 4px 12px rgba(0,0,0,0.35);
+}
+.navigation-user-marker{
+  width:20px;
+  height:20px;
+  box-sizing:border-box;
+  border:2px solid #ffffff;
+  border-radius:50%;
+  background:#14b8a6;
+  box-shadow:0 0 0 4px rgba(20,184,166,0.22), 0 0 18px rgba(20,184,166,0.58), 0 4px 12px rgba(0,0,0,0.38);
+  position:relative;
+}
+.navigation-user-marker::after{
+  content:"";
+  position:absolute;
+  left:6px;
+  top:6px;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:#ffffff;
 }
 .control-field{
   display:flex;

@@ -1,23 +1,31 @@
 import './styles/map3d.css';
 import proj4 from 'proj4';
 import * as THREE from 'three';
-import AMapLoader from '@amap/amap-jsapi-loader';
 
 window.proj4 = proj4;
 window.THREE = THREE;
 window.__THREE_LOAD_FAILED = false;
 
 var AMap = null;
+var AMapLoader = null;
 
 var DXF_FILE_NAME = import.meta.env.VITE_DXF_FILE_NAME || '宽厚里.dxf';
 var WGS84 = 'WGS84';
 var POSTER_MODE = window.IS_POSTER_MODE === true;
+var NAVIGATION_MODE = window.IS_NAVIGATION_MODE === true;
 var MAP_STYLE_CONFIG_API = '/api/map-style-config';
 var BUILDING_STYLE_AREA_MIN_POINTS = 3;
 var EXPORT_ACCELERATION_MODES = ['auto', 'gpu', 'software'];
 var EXPORT_ASPECT_RATIOS = ['16:9', '4:3'];
+var CONSOLE_TAB_NAMES = ['data', 'area', 'style', 'layers', 'export', 'advanced'];
 var EXPORT_WARNING_PIXELS = 30000000;
 var EXPORT_MAX_PIXELS = 90000000;
+var NAVIGATION_ARRIVAL_DISTANCE = 25;
+var NAVIGATION_STEP_DISTANCE = 45;
+var NAVIGATION_OFF_ROUTE_DISTANCE = 90;
+var NAVIGATION_REROUTE_COOLDOWN = 30000;
+var NAVIGATION_SPEAK_COOLDOWN = 5000;
+var NAVIGATION_FOLLOW_ZOOM = 18;
 var EXPORT_PRESETS = {
   preview: {
     label: '快速预览',
@@ -254,6 +262,24 @@ var pendingStyleConfigTimer = null;
 var pendingValveRefreshTimer = null;
 var pendingDeferredLayerCount = 0;
 var isPosterExporting = false;
+var navigationTarget = null;
+var navigationOrigin = null;
+var navigationWalking = null;
+var navigationGeolocation = null;
+var navigationOriginMarker = null;
+var navigationUserMarker = null;
+var navigationAccuracyCircle = null;
+var navigationRoute = null;
+var navigationRouteSteps = [];
+var navigationRoutePath = [];
+var navigationWatchId = null;
+var navigationTracking = false;
+var navigationVoiceEnabled = true;
+var navigationLastSpokenText = '';
+var navigationLastSpokenAt = 0;
+var navigationLastRerouteAt = 0;
+var navigationArrivalSpoken = false;
+var isPickingNavigationOrigin = false;
 var deferredLayerTimers = [];
 var dxfProcessingCache = {
   text: null,
@@ -679,7 +705,7 @@ function updateConsoleToggleState(){
 }
 
 function activateConsoleTab(tabName, persist){
-  var tab = normalizeChoice(tabName, DEFAULT_MAP_STYLE_CONFIG.ui.activeTab, ['data', 'area', 'style', 'layers', 'export', 'advanced']);
+  var tab = normalizeChoice(tabName, DEFAULT_MAP_STYLE_CONFIG.ui.activeTab, CONSOLE_TAB_NAMES);
   document.querySelectorAll('.tab-button').forEach(function(button){
     button.classList.toggle('active', button.getAttribute('data-tab') === tab);
   });
@@ -731,7 +757,7 @@ function normalizeMapStyleConfig(config){
     },
     ui: {
       collapsed: Boolean(source.ui && source.ui.collapsed),
-      activeTab: normalizeChoice(source.ui && source.ui.activeTab, DEFAULT_MAP_STYLE_CONFIG.ui.activeTab, ['data', 'area', 'style', 'layers', 'export', 'advanced']),
+      activeTab: normalizeChoice(source.ui && source.ui.activeTab, DEFAULT_MAP_STYLE_CONFIG.ui.activeTab, CONSOLE_TAB_NAMES),
       detailsOpen: Boolean(source.ui && source.ui.detailsOpen)
     },
     view: {
@@ -1311,10 +1337,18 @@ function initPipelineTools(){
   var saveStyleConfigBtn = document.getElementById('saveStyleConfigBtn');
   var exportPosterBtn = document.getElementById('exportPosterBtn');
   var toggleConsoleBtn = document.getElementById('toggleConsoleBtn');
+  var locateNavigationOriginBtn = document.getElementById('locateNavigationOriginBtn');
+  var pickNavigationOriginBtn = document.getElementById('pickNavigationOriginBtn');
+  var planNavigationRouteBtn = document.getElementById('planNavigationRouteBtn');
+  var clearNavigationRouteBtn = document.getElementById('clearNavigationRouteBtn');
+  var startNavigationTrackingBtn = document.getElementById('startNavigationTrackingBtn');
+  var stopNavigationTrackingBtn = document.getElementById('stopNavigationTrackingBtn');
+  var navigationVoiceInput = document.getElementById('navigationVoiceInput');
+  var testNavigationVoiceBtn = document.getElementById('testNavigationVoiceBtn');
 
-  crsSelect.value = currentProjectionId;
+  if (crsSelect) crsSelect.value = currentProjectionId;
 
-  loadBtn.addEventListener('click', function(){
+  if (loadBtn) loadBtn.addEventListener('click', function(){
     if (currentDxfText) {
       renderDxfText(currentDxfText, currentProjectionId);
       return;
@@ -1322,39 +1356,54 @@ function initPipelineTools(){
     loadDefaultDxf();
   });
 
-  pickBtn.addEventListener('click', function(){
+  if (pickBtn) pickBtn.addEventListener('click', function(){
     fileInput.click();
   });
 
-  fileInput.addEventListener('change', function(event){
+  if (fileInput) fileInput.addEventListener('change', function(event){
     var file = event.target.files && event.target.files[0];
     if (!file) return;
     readLocalDxfFile(file);
     fileInput.value = '';
   });
 
-  crsSelect.addEventListener('change', function(event){
+  if (crsSelect) crsSelect.addEventListener('change', function(event){
     currentProjectionId = event.target.value;
     if (!currentDxfText) return;
     renderDxfText(currentDxfText, currentProjectionId);
   });
 
-  fitBtn.addEventListener('click', fitPipelineView);
+  if (fitBtn) fitBtn.addEventListener('click', fitPipelineView);
 
-  drawBuildingAreaBtn.addEventListener('click', toggleBuildingStyleAreaDrawing);
-  saveBuildingAreaBtn.addEventListener('click', finishBuildingStyleAreaDrawing);
-  clearBuildingAreaBtn.addEventListener('click', clearManualBuildingStyleArea);
-  saveStyleConfigBtn.addEventListener('click', function(){
+  if (drawBuildingAreaBtn) drawBuildingAreaBtn.addEventListener('click', toggleBuildingStyleAreaDrawing);
+  if (saveBuildingAreaBtn) saveBuildingAreaBtn.addEventListener('click', finishBuildingStyleAreaDrawing);
+  if (clearBuildingAreaBtn) clearBuildingAreaBtn.addEventListener('click', clearManualBuildingStyleArea);
+  if (saveStyleConfigBtn) saveStyleConfigBtn.addEventListener('click', function(){
     saveMapStyleConfig('样式配置已保存到 config/map3d-style.json');
   });
-  exportPosterBtn.addEventListener('click', exportCurrentPosterView);
+  if (exportPosterBtn) exportPosterBtn.addEventListener('click', exportCurrentPosterView);
+  if (locateNavigationOriginBtn) locateNavigationOriginBtn.addEventListener('click', locateNavigationOrigin);
+  if (pickNavigationOriginBtn) pickNavigationOriginBtn.addEventListener('click', startPickingNavigationOrigin);
+  if (planNavigationRouteBtn) planNavigationRouteBtn.addEventListener('click', planWalkingRoute);
+  if (clearNavigationRouteBtn) clearNavigationRouteBtn.addEventListener('click', clearNavigationRoute);
+  if (startNavigationTrackingBtn) startNavigationTrackingBtn.addEventListener('click', startNavigationTracking);
+  if (stopNavigationTrackingBtn) stopNavigationTrackingBtn.addEventListener('click', stopNavigationTracking);
+  if (navigationVoiceInput) navigationVoiceInput.addEventListener('change', function(){
+    navigationVoiceEnabled = navigationVoiceInput.checked;
+    updateNavigationPanel();
+  });
+  if (testNavigationVoiceBtn) testNavigationVoiceBtn.addEventListener('click', function(){
+    speakNavigation('语音播报测试。实时导航开始后，将播报路线提示。', true);
+  });
   initExportPresetControls();
-  toggleConsoleBtn.addEventListener('click', function(){
+  if (toggleConsoleBtn) toggleConsoleBtn.addEventListener('click', function(){
     var consoleEl = document.getElementById('mapConsole');
+    if (!consoleEl) return;
     consoleEl.classList.toggle('collapsed');
     mapStyleConfig.ui.collapsed = consoleEl.classList.contains('collapsed');
     updateConsoleToggleState();
   });
+  initNavigationConsoleToggle();
   document.querySelectorAll('.tab-button').forEach(function(button){
     button.addEventListener('click', function(){
       activateConsoleTab(button.getAttribute('data-tab'), false);
@@ -1362,8 +1411,10 @@ function initPipelineTools(){
   });
   initStyleConfigInputEvents();
   map.on('click', handleBuildingStyleAreaMapClick);
+  map.on('click', handleNavigationOriginMapClick);
   updateStyleConfigInputs();
   updateBuildingStyleAreaToolState();
+  updateNavigationPanel();
 }
 
 function initExportPresetControls(){
@@ -1371,6 +1422,19 @@ function initExportPresetControls(){
     button.addEventListener('click', function(){
       applyExportPreset(button.getAttribute('data-export-preset'));
     });
+  });
+}
+
+function initNavigationConsoleToggle(){
+  var toggleBtn = document.getElementById('toggleNavigationConsoleBtn');
+  var consoleEl = document.getElementById('navigationConsole');
+  if (!toggleBtn || !consoleEl) return;
+  toggleBtn.addEventListener('click', function(){
+    consoleEl.classList.toggle('collapsed');
+    var collapsed = consoleEl.classList.contains('collapsed');
+    toggleBtn.textContent = collapsed ? '›' : '‹';
+    toggleBtn.title = collapsed ? '展开面板' : '收起面板';
+    toggleBtn.setAttribute('aria-label', toggleBtn.title);
   });
 }
 
@@ -1461,11 +1525,9 @@ function toggleBuildingStyleAreaDrawing(){
 
 function handleBuildingStyleAreaMapClick(event){
   if (!isDrawingBuildingStyleArea || !event || !event.lnglat) return;
-  var lnglat = event.lnglat;
-  var lng = typeof lnglat.getLng === 'function' ? lnglat.getLng() : lnglat.lng;
-  var lat = typeof lnglat.getLat === 'function' ? lnglat.getLat() : lnglat.lat;
-  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
-  draftBuildingStyleAreaPath.push([lng, lat]);
+  var point = getEventLngLat(event);
+  if (!point) return;
+  draftBuildingStyleAreaPath.push(point);
   if (draftBuildingStyleAreaPath.length >= BUILDING_STYLE_AREA_MIN_POINTS) {
     updateBuildingStyleAreaOverlay(draftBuildingStyleAreaPath);
   }
@@ -1532,6 +1594,689 @@ function updateBuildingStyleAreaToolState(){
   clearBuildingAreaBtn.disabled = isDrawingBuildingStyleArea && !savedBuildingStyleAreaPath.length;
 }
 
+function selectNavigationTarget(facility){
+  if (!facility || !isValidLngLat(facility.lnglat)) {
+    setNavigationStatus('设施缺少有效坐标，不能作为导航终点。', true);
+    return;
+  }
+  navigationTarget = facility;
+  clearNavigationRouteResult();
+  if (document.querySelector('[data-tab="navigation"]')) activateConsoleTab('navigation', false);
+  updateNavigationPanel();
+  setNavigationStatus('已选择终点：' + getFacilityDisplayName(facility));
+}
+
+function setNavigationOrigin(lnglat, label){
+  var point = normalizeNavigationLngLat(lnglat);
+  if (!point) {
+    setNavigationStatus('起点坐标无效。', true);
+    return;
+  }
+  navigationOrigin = {
+    lnglat: point,
+    label: label || '起点'
+  };
+  stopNavigationTracking();
+  clearNavigationRouteResult();
+  renderNavigationOriginMarker();
+  updateNavigationPanel();
+  setNavigationStatus('已设置起点：' + navigationOrigin.label);
+}
+
+function locateNavigationOrigin(){
+  if (!isNavigationGeolocationAllowed()) {
+    setNavigationStatus(getNavigationGeolocationBlockedMessage(), true);
+    updateNavigationRealtimeStatus(getNavigationGeolocationBlockedMessage(), true);
+    return;
+  }
+  if (!AMap || !AMap.Geolocation) {
+    setNavigationStatus('定位插件未加载，无法使用当前位置。', true);
+    return;
+  }
+  isPickingNavigationOrigin = false;
+  updateNavigationPanel();
+  setNavigationStatus('正在获取当前位置...');
+  if (!navigationGeolocation) {
+    navigationGeolocation = new AMap.Geolocation({
+      enableHighAccuracy: true,
+      timeout: 12000,
+      showButton: false,
+      showMarker: false,
+      panToLocation: false,
+      zoomToAccuracy: false
+    });
+  }
+  navigationGeolocation.getCurrentPosition(function(status, result){
+    if (status === 'complete' && result && result.position) {
+      setNavigationOrigin(lngLatLikeToArray(result.position), '当前位置');
+      return;
+    }
+    var message = result && (result.message || result.info) ? result.message || result.info : '浏览器或高德定位失败';
+    setNavigationStatus('定位失败：' + message + '。可改用地图点选起点。', true);
+  });
+}
+
+function startPickingNavigationOrigin(){
+  if (isDrawingBuildingStyleArea) {
+    cancelBuildingStyleAreaDrawing();
+  }
+  isPickingNavigationOrigin = true;
+  updateNavigationPanel();
+  setNavigationStatus('请在地图上点击起点位置。');
+}
+
+function handleNavigationOriginMapClick(event){
+  if (!isPickingNavigationOrigin) return;
+  var point = getEventLngLat(event);
+  if (!point) {
+    setNavigationStatus('未获取到点击坐标，请重试。', true);
+    return;
+  }
+  isPickingNavigationOrigin = false;
+  setNavigationOrigin(point, '地图点选起点');
+}
+
+function planWalkingRoute(){
+  if (!navigationTarget || !isValidLngLat(navigationTarget.lnglat)) {
+    setNavigationStatus('请先点击地图上的阀门或调压柜作为终点。', true);
+    updateNavigationPanel();
+    return;
+  }
+  if (!navigationOrigin || !isValidLngLat(navigationOrigin.lnglat)) {
+    setNavigationStatus('请先使用当前位置或地图点选设置起点。', true);
+    updateNavigationPanel();
+    return;
+  }
+  var walking = getNavigationWalking();
+  if (!walking) {
+    setNavigationStatus('步行路线插件未加载，无法规划路线。', true);
+    return;
+  }
+  clearNavigationRouteResult();
+  updateNavigationPanel();
+  setNavigationStatus('正在规划步行路线...');
+  walking.search(toAmapLngLat(navigationOrigin.lnglat), toAmapLngLat(navigationTarget.lnglat), function(status, result){
+    if (status === 'complete') {
+      storeNavigationRoute(result);
+      updateNavigationRouteSummary(result);
+      setNavigationStatus('步行路线规划完成。');
+      speakNavigation(navigationTracking ? '路线已重新规划。' : '路线规划完成，可以开始实时跟踪。');
+      return;
+    }
+    var message = getWalkingRouteErrorMessage(result);
+    setNavigationStatus('路线规划失败：' + message, true);
+    updateNavigationRouteSummary(null);
+  });
+}
+
+function clearNavigationRoute(){
+  isPickingNavigationOrigin = false;
+  stopNavigationTracking();
+  clearNavigationRouteResult();
+  updateNavigationPanel();
+  setNavigationStatus('已清除路线。');
+}
+
+function clearNavigationRouteResult(){
+  navigationRoute = null;
+  navigationRouteSteps = [];
+  navigationRoutePath = [];
+  navigationArrivalSpoken = false;
+  if (!navigationTracking) clearNavigationUserMarker();
+  if (navigationWalking && typeof navigationWalking.clear === 'function') {
+    navigationWalking.clear();
+  }
+  var summaryEl = document.getElementById('navigationSummary');
+  var stepsEl = document.getElementById('navigationSteps');
+  if (summaryEl) {
+    summaryEl.textContent = '暂无路线。';
+    summaryEl.classList.add('muted');
+  }
+  if (stepsEl) stepsEl.innerHTML = '';
+  updateNavigationRealtimeStatus('等待路线。', true);
+}
+
+function updateNavigationPanel(){
+  var targetEl = document.getElementById('navigationTargetInfo');
+  var originEl = document.getElementById('navigationOriginInfo');
+  var locateBtn = document.getElementById('locateNavigationOriginBtn');
+  var pickBtn = document.getElementById('pickNavigationOriginBtn');
+  var planBtn = document.getElementById('planNavigationRouteBtn');
+  var linkEl = document.getElementById('openAmapNavigationLink');
+  var startTrackingBtn = document.getElementById('startNavigationTrackingBtn');
+  var stopTrackingBtn = document.getElementById('stopNavigationTrackingBtn');
+  var voiceInput = document.getElementById('navigationVoiceInput');
+  if (targetEl) {
+    if (navigationTarget) {
+      targetEl.classList.remove('muted');
+      targetEl.textContent = getFacilityDisplayName(navigationTarget) + ' / ' + formatNavigationLngLat(navigationTarget.lnglat);
+    } else {
+      targetEl.classList.add('muted');
+      targetEl.textContent = '点击地图上的阀门或调压柜选择终点。';
+    }
+  }
+  if (originEl) {
+    if (navigationOrigin) {
+      originEl.classList.remove('muted');
+      originEl.textContent = navigationOrigin.label + ' / ' + formatNavigationLngLat(navigationOrigin.lnglat);
+    } else {
+      originEl.classList.add('muted');
+      originEl.textContent = isPickingNavigationOrigin ? '等待地图点选起点。' : '尚未设置起点。';
+    }
+  }
+  if (locateBtn) locateBtn.disabled = isPickingNavigationOrigin;
+  if (pickBtn) pickBtn.textContent = isPickingNavigationOrigin ? '等待点选...' : '地图点选起点';
+  if (planBtn) planBtn.disabled = !(navigationTarget && navigationOrigin);
+  if (startTrackingBtn) startTrackingBtn.disabled = navigationTracking || !navigationRoute;
+  if (stopTrackingBtn) stopTrackingBtn.disabled = !navigationTracking;
+  if (voiceInput) voiceInput.checked = navigationVoiceEnabled;
+  updateAmapNavigationLink(linkEl);
+}
+
+function updateAmapNavigationLink(linkEl){
+  var link = linkEl || document.getElementById('openAmapNavigationLink');
+  if (!link) return;
+  var url = buildAmapNavigationUrl();
+  if (!url) {
+    link.classList.add('disabled');
+    link.setAttribute('aria-disabled', 'true');
+    link.setAttribute('href', '#');
+    return;
+  }
+  link.classList.remove('disabled');
+  link.setAttribute('aria-disabled', 'false');
+  link.setAttribute('href', url);
+}
+
+function updateNavigationRouteSummary(result){
+  var summaryEl = document.getElementById('navigationSummary');
+  if (!summaryEl) return;
+  var route = result && result.routes && result.routes[0] ? result.routes[0] : null;
+  if (!route) {
+    summaryEl.classList.add('muted');
+    summaryEl.textContent = '暂无路线。';
+    return;
+  }
+  var parts = [];
+  var distance = toNumber(route.distance);
+  var time = toNumber(route.time || route.duration);
+  if (Number.isFinite(distance)) parts.push('距离 ' + formatRouteDistance(distance));
+  if (Number.isFinite(time)) parts.push('预计 ' + formatRouteTime(time));
+  summaryEl.classList.remove('muted');
+  summaryEl.textContent = parts.length ? parts.join(' / ') : '路线已生成，请查看下方步骤。';
+}
+
+function storeNavigationRoute(result){
+  navigationRoute = getWalkingRoute(result);
+  navigationRouteSteps = getNavigationRouteSteps(navigationRoute);
+  navigationRoutePath = getNavigationRoutePath(navigationRouteSteps);
+  navigationArrivalSpoken = false;
+  updateNavigationPanel();
+  updateNavigationRealtimeStatus('路线已生成，可开始实时跟踪。', false);
+}
+
+function getWalkingRoute(result){
+  if (!result) return null;
+  if (result.routes && result.routes[0]) return result.routes[0];
+  if (result.route && result.route.paths && result.route.paths[0]) return result.route.paths[0];
+  if (result.paths && result.paths[0]) return result.paths[0];
+  return null;
+}
+
+function getNavigationRouteSteps(route){
+  if (!route) return [];
+  var steps = route.steps || route.segments || [];
+  if (!Array.isArray(steps)) return [];
+  return steps.map(function(step, index){
+    var path = getStepPath(step);
+    return {
+      index: index,
+      instruction: step.instruction || step.road || ('继续步行 ' + (index + 1)),
+      distance: toNumber(step.distance),
+      duration: toNumber(step.duration || step.time),
+      path: path
+    };
+  }).filter(function(step){
+    return step.path.length > 0;
+  });
+}
+
+function getNavigationRoutePath(steps){
+  var path = [];
+  steps.forEach(function(step){
+    step.path.forEach(function(point){
+      path.push(point);
+    });
+  });
+  return path;
+}
+
+function getStepPath(step){
+  var path = [];
+  if (Array.isArray(step.path)) {
+    path = step.path.map(lngLatLikeToArray).filter(Boolean);
+  } else if (Array.isArray(step.polyline)) {
+    path = step.polyline.map(lngLatLikeToArray).filter(Boolean);
+  } else if (typeof step.polyline === 'string') {
+    path = step.polyline.split(';').map(function(item){
+      var parts = item.split(',').map(Number);
+      return normalizeNavigationLngLat(parts);
+    }).filter(Boolean);
+  }
+  return path;
+}
+
+function startNavigationTracking(){
+  if (!NAVIGATION_MODE) return;
+  if (!isNavigationGeolocationAllowed()) {
+    setNavigationStatus(getNavigationGeolocationBlockedMessage(), true);
+    updateNavigationRealtimeStatus(getNavigationGeolocationBlockedMessage(), true);
+    return;
+  }
+  if (!navigationRoute) {
+    setNavigationStatus('请先规划路线。', true);
+    return;
+  }
+  if (!navigator.geolocation || typeof navigator.geolocation.watchPosition !== 'function') {
+    setNavigationStatus('当前浏览器不支持实时定位。', true);
+    return;
+  }
+  stopNavigationTracking(false);
+  navigationTracking = true;
+  navigationArrivalSpoken = false;
+  updateNavigationPanel();
+  updateNavigationRealtimeStatus('正在启动实时定位...');
+  speakNavigation('实时导航已开始。');
+  navigationWatchId = navigator.geolocation.watchPosition(
+    handleNavigationWatchPosition,
+    handleNavigationWatchError,
+    {
+      enableHighAccuracy: true,
+      maximumAge: 1000,
+      timeout: 15000
+    }
+  );
+}
+
+function stopNavigationTracking(announce){
+  if (navigationWatchId !== null && navigator.geolocation && typeof navigator.geolocation.clearWatch === 'function') {
+    navigator.geolocation.clearWatch(navigationWatchId);
+  }
+  navigationWatchId = null;
+  if (navigationTracking && announce !== false) {
+    speakNavigation('实时导航已停止。');
+  }
+  navigationTracking = false;
+  updateNavigationPanel();
+  if (announce !== false) updateNavigationRealtimeStatus(navigationRoute ? '实时跟踪已停止。' : '等待路线。', !navigationRoute);
+}
+
+function handleNavigationWatchPosition(position){
+  if (!position || !position.coords) return;
+  var point = wgs84ToGcj02(position.coords.longitude, position.coords.latitude);
+  if (!isValidLngLat(point)) return;
+  var accuracy = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : 0;
+  navigationOrigin = {
+    lnglat: point,
+    label: '实时当前位置'
+  };
+  renderNavigationUserMarker(point, accuracy);
+  updateNavigationProgress(point, accuracy);
+  updateAmapNavigationLink();
+  if (map && typeof map.setCenter === 'function') {
+    map.setCenter(point);
+    if (typeof map.setZoom === 'function' && map.getZoom && map.getZoom() < NAVIGATION_FOLLOW_ZOOM) {
+      map.setZoom(NAVIGATION_FOLLOW_ZOOM);
+    }
+  }
+}
+
+function handleNavigationWatchError(error){
+  var message = error && error.message ? error.message : '实时定位失败';
+  if (!isNavigationGeolocationAllowed()) message = getNavigationGeolocationBlockedMessage();
+  setNavigationStatus('实时定位失败：' + message, true);
+  updateNavigationRealtimeStatus('实时定位失败：' + message, true);
+  stopNavigationTracking(false);
+}
+
+function isNavigationGeolocationAllowed(){
+  return window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+}
+
+function getNavigationGeolocationBlockedMessage(){
+  return '当前页面不是安全来源，手机浏览器可能禁止 GPS 定位。请使用 HTTPS 地址，或先用“地图点选起点”测试路线。';
+}
+
+function renderNavigationUserMarker(point, accuracy){
+  if (!navigationUserMarker) {
+    navigationUserMarker = new AMap.Marker({
+      position: point,
+      zIndex: getLayerZIndex('label') + 140,
+      offset: new AMap.Pixel(-10, -10),
+      title: '实时当前位置',
+      content: '<div class="navigation-user-marker" aria-hidden="true"></div>'
+    });
+    map.add(navigationUserMarker);
+  } else if (typeof navigationUserMarker.setPosition === 'function') {
+    navigationUserMarker.setPosition(point);
+  }
+  if (accuracy > 0 && AMap.Circle) {
+    if (!navigationAccuracyCircle) {
+      navigationAccuracyCircle = new AMap.Circle({
+        center: point,
+        radius: accuracy,
+        zIndex: getLayerZIndex('label') - 1,
+        fillColor: '#1d6cff',
+        fillOpacity: 0.12,
+        strokeColor: '#74aaff',
+        strokeOpacity: 0.45,
+        strokeWeight: 1
+      });
+      map.add(navigationAccuracyCircle);
+    } else {
+      navigationAccuracyCircle.setCenter(point);
+      navigationAccuracyCircle.setRadius(accuracy);
+    }
+  }
+}
+
+function clearNavigationUserMarker(){
+  var overlays = [];
+  if (navigationUserMarker) overlays.push(navigationUserMarker);
+  if (navigationAccuracyCircle) overlays.push(navigationAccuracyCircle);
+  if (overlays.length) {
+    try {
+      map.remove(overlays);
+    } catch (error) {
+      console.warn('Failed to remove navigation realtime overlays', error);
+    }
+  }
+  navigationUserMarker = null;
+  navigationAccuracyCircle = null;
+}
+
+function updateNavigationProgress(point, accuracy){
+  if (!navigationTarget || !navigationRoutePath.length) return;
+  var targetDistance = calculateLngLatDistance(point, navigationTarget.lnglat);
+  var nearestRoute = findNearestPointOnPath(point, navigationRoutePath);
+  var nearestStep = findNearestRouteStep(point);
+  var messages = [
+    '距终点 ' + formatRouteDistance(targetDistance)
+  ];
+  if (nearestStep) {
+    messages.push('当前提示：' + nearestStep.step.instruction);
+    messages.push('距提示点 ' + formatRouteDistance(nearestStep.distance));
+    if (nearestStep.distance <= NAVIGATION_STEP_DISTANCE) {
+      speakNavigation(nearestStep.step.instruction);
+    }
+  }
+  if (accuracy > 0) messages.push('定位精度约 ' + formatRouteDistance(accuracy));
+  if (nearestRoute && nearestRoute.distance > NAVIGATION_OFF_ROUTE_DISTANCE) {
+    messages.push('已偏离路线 ' + formatRouteDistance(nearestRoute.distance));
+    maybeRerouteFrom(point);
+  }
+  if (targetDistance <= NAVIGATION_ARRIVAL_DISTANCE) {
+    messages.unshift('已接近目标设施');
+    if (!navigationArrivalSpoken) {
+      navigationArrivalSpoken = true;
+      speakNavigation('已接近目标设施，请注意现场安全。', true);
+    }
+  }
+  updateNavigationRealtimeStatus(messages.join(' / '), false);
+}
+
+function findNearestRouteStep(point){
+  var best = null;
+  navigationRouteSteps.forEach(function(step){
+    var nearest = findNearestPointOnPath(point, step.path);
+    if (!nearest) return;
+    if (!best || nearest.distance < best.distance) {
+      best = {
+        step: step,
+        distance: nearest.distance
+      };
+    }
+  });
+  return best;
+}
+
+function findNearestPointOnPath(point, path){
+  if (!path || !path.length) return null;
+  var best = null;
+  for (var i = 1; i < path.length; i += 1) {
+    var nearest = nearestPointOnSegment(point, path[i - 1], path[i]);
+    if (!nearest) continue;
+    if (!best || nearest.distance < best.distance) best = nearest;
+  }
+  if (!best && path.length === 1) {
+    best = {
+      point: path[0],
+      distance: calculateLngLatDistance(point, path[0])
+    };
+  }
+  return best;
+}
+
+function nearestPointOnSegment(point, a, b){
+  if (!isValidLngLat(point) || !isValidLngLat(a) || !isValidLngLat(b)) return null;
+  var refLat = point[1] * Math.PI / 180;
+  var scaleX = 111320 * Math.cos(refLat);
+  var scaleY = 110540;
+  var px = point[0] * scaleX;
+  var py = point[1] * scaleY;
+  var ax = a[0] * scaleX;
+  var ay = a[1] * scaleY;
+  var bx = b[0] * scaleX;
+  var by = b[1] * scaleY;
+  var dx = bx - ax;
+  var dy = by - ay;
+  var lengthSquared = dx * dx + dy * dy;
+  var t = lengthSquared <= 0.000001 ? 0 : ((px - ax) * dx + (py - ay) * dy) / lengthSquared;
+  t = Math.max(0, Math.min(1, t));
+  var nx = ax + dx * t;
+  var ny = ay + dy * t;
+  var nearest = [
+    (a[0] + (b[0] - a[0]) * t),
+    (a[1] + (b[1] - a[1]) * t)
+  ];
+  var distance = Math.sqrt((px - nx) * (px - nx) + (py - ny) * (py - ny));
+  return {
+    point: nearest,
+    distance: distance
+  };
+}
+
+function maybeRerouteFrom(point){
+  var now = Date.now();
+  if (now - navigationLastRerouteAt < NAVIGATION_REROUTE_COOLDOWN) return;
+  navigationLastRerouteAt = now;
+  if (!navigationTarget || !isValidLngLat(navigationTarget.lnglat)) return;
+  speakNavigation('检测到偏离路线，正在重新规划。', true);
+  navigationOrigin = {
+    lnglat: point,
+    label: '实时当前位置'
+  };
+  planWalkingRoute();
+}
+
+function updateNavigationRealtimeStatus(message, isMuted){
+  var liveEl = document.getElementById('navigationLiveInfo');
+  var statusEl = document.getElementById('navigationRealtimeStatus');
+  if (liveEl) {
+    liveEl.textContent = message;
+    liveEl.classList.toggle('muted', Boolean(isMuted));
+  }
+  if (statusEl) {
+    statusEl.textContent = navigationTracking ? '实时跟踪中。' : message;
+    statusEl.classList.toggle('danger', false);
+  }
+}
+
+function speakNavigation(text, force){
+  if (!navigationVoiceEnabled && !force) return;
+  if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) {
+    updateNavigationRealtimeStatus('浏览器不支持语音播报。', false);
+    return;
+  }
+  var normalized = String(text || '').trim();
+  if (!normalized) return;
+  var now = Date.now();
+  if (!force && normalized === navigationLastSpokenText && now - navigationLastSpokenAt < 60000) return;
+  if (!force && now - navigationLastSpokenAt < NAVIGATION_SPEAK_COOLDOWN) return;
+  navigationLastSpokenText = normalized;
+  navigationLastSpokenAt = now;
+  var utterance = new SpeechSynthesisUtterance(normalized);
+  utterance.lang = 'zh-CN';
+  utterance.rate = 1;
+  utterance.pitch = 1;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+
+function calculateLngLatDistance(a, b){
+  var pointA = normalizeNavigationLngLat(a);
+  var pointB = normalizeNavigationLngLat(b);
+  if (!pointA || !pointB) return Infinity;
+  var radLat1 = pointA[1] * Math.PI / 180;
+  var radLat2 = pointB[1] * Math.PI / 180;
+  var deltaLat = radLat2 - radLat1;
+  var deltaLng = (pointB[0] - pointA[0]) * Math.PI / 180;
+  var sinLat = Math.sin(deltaLat / 2);
+  var sinLng = Math.sin(deltaLng / 2);
+  var value = sinLat * sinLat + Math.cos(radLat1) * Math.cos(radLat2) * sinLng * sinLng;
+  return 6378137 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
+function getNavigationWalking(){
+  if (!AMap || !AMap.Walking) return null;
+  if (!navigationWalking) {
+    navigationWalking = new AMap.Walking({
+      map: map,
+      panel: 'navigationSteps'
+    });
+  }
+  return navigationWalking;
+}
+
+function renderNavigationOriginMarker(){
+  clearNavigationOriginMarker();
+  if (!navigationOrigin || !isValidLngLat(navigationOrigin.lnglat)) return;
+  navigationOriginMarker = new AMap.Marker({
+    position: navigationOrigin.lnglat,
+    zIndex: getLayerZIndex('label') + 120,
+    offset: new AMap.Pixel(-9, -9),
+    title: navigationOrigin.label,
+    content: '<div class="navigation-origin-marker" aria-hidden="true"></div>'
+  });
+  map.add(navigationOriginMarker);
+}
+
+function clearNavigationOriginMarker(){
+  if (!navigationOriginMarker) return;
+  try {
+    map.remove(navigationOriginMarker);
+  } catch (error) {
+    console.warn('Failed to remove navigation origin marker', error);
+  }
+  navigationOriginMarker = null;
+}
+
+function resetNavigationTarget(){
+  stopNavigationTracking(false);
+  navigationTarget = null;
+  isPickingNavigationOrigin = false;
+  clearNavigationRouteResult();
+  clearNavigationUserMarker();
+  updateNavigationPanel();
+}
+
+function setNavigationStatus(message, isError){
+  var statusEl = document.getElementById('navigationStatus');
+  if (statusEl) {
+    statusEl.textContent = message;
+    statusEl.classList.toggle('danger', Boolean(isError));
+  }
+  setStatus(message);
+}
+
+function buildAmapNavigationUrl(){
+  if (!navigationTarget || !isValidLngLat(navigationTarget.lnglat)) return '';
+  var params = new URLSearchParams();
+  if (navigationOrigin && isValidLngLat(navigationOrigin.lnglat)) {
+    params.set('from', navigationOrigin.lnglat[0].toFixed(6) + ',' + navigationOrigin.lnglat[1].toFixed(6) + ',' + navigationOrigin.label);
+  }
+  params.set('to', navigationTarget.lnglat[0].toFixed(6) + ',' + navigationTarget.lnglat[1].toFixed(6) + ',' + getFacilityDisplayName(navigationTarget));
+  params.set('mode', 'walk');
+  params.set('coordinate', 'gaode');
+  params.set('callnative', '1');
+  return 'https://uri.amap.com/navigation?' + params.toString();
+}
+
+function toAmapLngLat(lnglat){
+  var point = normalizeNavigationLngLat(lnglat);
+  return point && AMap && AMap.LngLat ? new AMap.LngLat(point[0], point[1]) : point;
+}
+
+function getWalkingRouteErrorMessage(result){
+  var code = typeof result === 'string' ? result : '';
+  if (!code && result && typeof result.info === 'string') code = result.info;
+  if (!code && result && typeof result.message === 'string') code = result.message;
+  if (code === 'USERKEY_PLAT_NOMATCH') {
+    return '高德 Key 平台类型不匹配（USERKEY_PLAT_NOMATCH）。插件脚本已加载，但路线服务拒绝当前 Key；请在高德控制台检查 VITE_AMAP_KEY 的平台类型/服务权限。';
+  }
+  if (code === 'INVALID_USER_SCODE') {
+    return '高德安全密钥校验失败（INVALID_USER_SCODE）。Web端 JS API Key 已加载，但 VITE_AMAP_SECURITY_CODE 与该 Key 不匹配，或控制台配置尚未生效。';
+  }
+  if (code) return code;
+  return '未找到可用路线';
+}
+
+function getEventLngLat(event){
+  if (!event || !event.lnglat) return null;
+  return lngLatLikeToArray(event.lnglat);
+}
+
+function lngLatLikeToArray(lnglat){
+  if (!lnglat) return null;
+  if (Array.isArray(lnglat)) return normalizeNavigationLngLat(lnglat);
+  var lng = typeof lnglat.getLng === 'function' ? lnglat.getLng() : lnglat.lng;
+  var lat = typeof lnglat.getLat === 'function' ? lnglat.getLat() : lnglat.lat;
+  return normalizeNavigationLngLat([lng, lat]);
+}
+
+function normalizeNavigationLngLat(lnglat){
+  return normalizeLngLat(lnglat, null);
+}
+
+function isValidLngLat(lnglat){
+  return Boolean(normalizeNavigationLngLat(lnglat));
+}
+
+function formatNavigationLngLat(lnglat){
+  var point = normalizeNavigationLngLat(lnglat);
+  if (!point) return '坐标无效';
+  return point[0].toFixed(6) + ', ' + point[1].toFixed(6);
+}
+
+function getFacilityDisplayName(facility){
+  if (!facility) return '设施';
+  var label = facility.label || '设施';
+  var name = facility.name || '';
+  return name && name !== label ? label + '：' + name : label;
+}
+
+function formatRouteDistance(distance){
+  if (distance >= 1000) return (distance / 1000).toFixed(2) + ' km';
+  return Math.round(distance) + ' m';
+}
+
+function formatRouteTime(seconds){
+  if (seconds >= 3600) {
+    return Math.floor(seconds / 3600) + '小时' + Math.round((seconds % 3600) / 60) + '分钟';
+  }
+  return Math.max(1, Math.round(seconds / 60)) + '分钟';
+}
+
 async function loadDefaultDxf(){
   setStatus('正在加载 ' + DXF_FILE_NAME + ' ...');
   updateExportReadyState({dxf: false, pipeline3d: false, valves: false});
@@ -1546,7 +2291,7 @@ async function loadDefaultDxf(){
     console.warn(error);
     currentDxfText = '';
     setStats('未加载');
-    document.getElementById('fitPipelineBtn').disabled = true;
+    setFitPipelineButtonDisabled(true);
     updateExportReadyState({dxf: false, pipeline3d: false, valves: false});
     setStatus('自动加载失败。若页面是本地直开，请点击“选择本地 DXF”手动导入。');
   }
@@ -1606,17 +2351,22 @@ function renderDxfText(dxfText, projectionId){
   if (!projected.features.length) {
     clearDxfOverlays();
     setStats('0 条管线');
-    document.getElementById('fitPipelineBtn').disabled = true;
+    setFitPipelineButtonDisabled(true);
     updateExportReadyState({dxf: false, pipeline3d: false, valves: false});
     setStatus('未解析出可绘制的线性实体');
     return;
   }
 
-  document.getElementById('fitPipelineBtn').disabled = false;
+  setFitPipelineButtonDisabled(false);
   setStats(formatProjectedStats(projected));
   setStatus('正在渲染三维管线，坐标系: ' + projection.label + ' ...');
   updateBuildingsLayerStyle(projected);
   drawProjectedFeatures(projected, projection.label);
+}
+
+function setFitPipelineButtonDisabled(disabled){
+  var fitBtn = document.getElementById('fitPipelineBtn');
+  if (fitBtn) fitBtn.disabled = disabled;
 }
 
 function getProjectedDxf(dxfText, projectionId){
@@ -2724,13 +3474,22 @@ function isVerticalProjectedSegment(a, b){
 
 function createValveSymbol(valve){
   var rotation = Number.isFinite(valve.rotation) ? valve.rotation : 0;
-  return new AMap.Marker({
+  var marker = new AMap.Marker({
     position: valve.lnglat,
     zIndex: getLayerZIndex('label'),
     offset: new AMap.Pixel(-VALVE_STYLE.width / 2, -VALVE_STYLE.height),
     title: (valve.label || valve.name || '设施') + (valve.name && valve.name !== valve.label ? '：' + valve.name : ''),
     content: createFacilitySvg(valve, rotation)
   });
+  if (NAVIGATION_MODE) {
+    marker.on('click', function(event){
+      if (event && event.originEvent && typeof event.originEvent.stopPropagation === 'function') {
+        event.originEvent.stopPropagation();
+      }
+      selectNavigationTarget(valve);
+    });
+  }
+  return marker;
 }
 
 function createFacilitySvg(facility, rotation){
@@ -2820,6 +3579,7 @@ function createValveLabel(valve){
 }
 
 function clearDxfOverlays(){
+  resetNavigationTarget();
   if (dxfThreeLayer) {
     disposePipeline3DState(dxfThreeState);
     try {
@@ -2990,15 +3750,24 @@ function wgs84ToGcj02(lng, lat){
 
 async function boot(){
   var amapKey = import.meta.env.VITE_AMAP_KEY || import.meta.env.AMAP_KEY || '';
+  var amapSecurityCode = import.meta.env.VITE_AMAP_SECURITY_CODE || import.meta.env.AMAP_SECURITY_CODE || '';
   if (!amapKey) {
     setStatus('缺少高德地图 Key：请在 .env 中配置 VITE_AMAP_KEY。');
     return;
   }
+  if (amapSecurityCode) {
+    window._AMapSecurityConfig = {
+      securityJsCode: amapSecurityCode
+    };
+  }
   try {
+    if (!AMapLoader) {
+      AMapLoader = (await import('@amap/amap-jsapi-loader')).default;
+    }
     AMap = await AMapLoader.load({
       key: amapKey,
       version: '2.0',
-      plugins: ['AMap.ControlBar', 'AMap.ToolBar']
+      plugins: ['AMap.ControlBar', 'AMap.ToolBar', 'AMap.Walking', 'AMap.Geolocation']
     });
     window.AMap = AMap;
     mapInit();
