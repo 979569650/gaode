@@ -1,5 +1,4 @@
 exports/
-output/
 node_modules/
 dist/
 release/

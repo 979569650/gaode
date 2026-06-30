@@ -5,9 +5,7 @@
     "build": "vite build",
     "dev": "vite --host 127.0.0.1",
     "export:poster": "node scripts/export-poster.js",
-    "serve": "node scripts/export-server.js",
-    "public:nav": "node scripts/start-public-navigation.js",
-    "public:nav:stop": "node scripts/start-public-navigation.js --stop"
+    "serve": "node scripts/export-server.js"
   },
   "devDependencies": {
     "playwright": "^1.61.0"
