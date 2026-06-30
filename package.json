@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build": "vite build",
+    "build:pages": "npm run build && node scripts/prepare-github-pages.js",
     "dev": "vite --host 127.0.0.1",
     "export:poster": "node scripts/export-poster.js",
     "serve": "node scripts/export-server.js"
