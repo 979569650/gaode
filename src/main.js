@@ -575,6 +575,13 @@ function clearBuildingStyleOutsideOverlay(){
 
 async function loadMapStyleConfig(){
   try {
+    if (isStaticMapStyleConfigHost()) {
+      var hostedResponse = await fetch(MAP_STYLE_CONFIG_STATIC_FILE, {cache: 'no-store'});
+      if (!hostedResponse.ok) throw new Error('HTTP ' + hostedResponse.status);
+      setMapStyleConfig(await hostedResponse.json());
+      setStatus('已读取静态样式配置: config/map3d-style.json');
+      return;
+    }
     var response = await fetch(MAP_STYLE_CONFIG_API, {cache: 'no-store'});
     if (!response.ok) {
       var staticResponse = await fetch(MAP_STYLE_CONFIG_STATIC_FILE, {cache: 'no-store'});
@@ -592,6 +599,10 @@ async function loadMapStyleConfig(){
     setMapStyleConfig(DEFAULT_MAP_STYLE_CONFIG);
     setStatus('未读取到本地样式配置；如需保存到 JSON，请通过 npm run serve 打开页面。');
   }
+}
+
+function isStaticMapStyleConfigHost(){
+  return location.hostname.endsWith('.github.io');
 }
 
 function setMapStyleConfig(config){
