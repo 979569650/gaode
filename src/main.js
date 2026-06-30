@@ -273,12 +273,21 @@ var navigationRoute = null;
 var navigationRouteSteps = [];
 var navigationRoutePath = [];
 var navigationWatchId = null;
+var navigationAmapWatchTimer = null;
+var navigationWatchSource = '';
+var navigationTriedAmapFallback = false;
 var navigationTracking = false;
 var navigationVoiceEnabled = true;
+var navigationVoiceReady = false;
+var navigationVoiceBlocked = false;
 var navigationLastSpokenText = '';
 var navigationLastSpokenAt = 0;
 var navigationLastRerouteAt = 0;
 var navigationArrivalSpoken = false;
+var navigationHeading = null;
+var navigationHeadingSource = '';
+var navigationLastUserPoint = null;
+var navigationHeadingListening = false;
 var isPickingNavigationOrigin = false;
 var deferredLayerTimers = [];
 var dxfProcessingCache = {
@@ -1390,11 +1399,28 @@ function initPipelineTools(){
   if (stopNavigationTrackingBtn) stopNavigationTrackingBtn.addEventListener('click', stopNavigationTracking);
   if (navigationVoiceInput) navigationVoiceInput.addEventListener('change', function(){
     navigationVoiceEnabled = navigationVoiceInput.checked;
+    if (navigationVoiceEnabled) {
+      initializeNavigationVoice('语音播报已开启。');
+    } else if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      updateNavigationRealtimeStatus('语音播报已关闭。', false);
+    }
     updateNavigationPanel();
   });
   if (testNavigationVoiceBtn) testNavigationVoiceBtn.addEventListener('click', function(){
-    speakNavigation('语音播报测试。实时导航开始后，将播报路线提示。', true);
+    if (!isNavigationVoiceApiSupported()) {
+      openAmapNavigationFallback();
+      return;
+    }
+    navigationVoiceEnabled = true;
+    if (navigationVoiceInput) navigationVoiceInput.checked = true;
+    initializeNavigationVoice('语音播报测试。实时导航开始后，将播报路线提示。');
   });
+  if (window.speechSynthesis && typeof window.speechSynthesis.addEventListener === 'function') {
+    window.speechSynthesis.addEventListener('voiceschanged', function(){
+      if (navigationVoiceReady && navigationVoiceEnabled) getNavigationChineseVoice();
+    });
+  }
   initExportPresetControls();
   if (toggleConsoleBtn) toggleConsoleBtn.addEventListener('click', function(){
     var consoleEl = document.getElementById('mapConsole');
@@ -1429,13 +1455,18 @@ function initNavigationConsoleToggle(){
   var toggleBtn = document.getElementById('toggleNavigationConsoleBtn');
   var consoleEl = document.getElementById('navigationConsole');
   if (!toggleBtn || !consoleEl) return;
+  updateNavigationConsoleToggleLabel(toggleBtn, consoleEl.classList.contains('collapsed'));
   toggleBtn.addEventListener('click', function(){
     consoleEl.classList.toggle('collapsed');
-    var collapsed = consoleEl.classList.contains('collapsed');
-    toggleBtn.textContent = collapsed ? '›' : '‹';
-    toggleBtn.title = collapsed ? '展开面板' : '收起面板';
-    toggleBtn.setAttribute('aria-label', toggleBtn.title);
+    updateNavigationConsoleToggleLabel(toggleBtn, consoleEl.classList.contains('collapsed'));
   });
+}
+
+function updateNavigationConsoleToggleLabel(toggleBtn, collapsed){
+  var title = collapsed ? '展开面板' : '收起面板';
+  toggleBtn.textContent = collapsed ? '展开' : '收起';
+  toggleBtn.title = title;
+  toggleBtn.setAttribute('aria-label', title);
 }
 
 function applyExportPreset(name){
@@ -1629,13 +1660,59 @@ function locateNavigationOrigin(){
     updateNavigationRealtimeStatus(getNavigationGeolocationBlockedMessage(), true);
     return;
   }
-  if (!AMap || !AMap.Geolocation) {
-    setNavigationStatus('定位插件未加载，无法使用当前位置。', true);
-    return;
-  }
   isPickingNavigationOrigin = false;
   updateNavigationPanel();
   setNavigationStatus('正在获取当前位置...');
+  locateNavigationOriginByBrowser(function(errorMessage){
+    locateNavigationOriginByAmap(function(amapErrorMessage){
+      var message = amapErrorMessage || errorMessage || '浏览器和高德定位都失败';
+      setNavigationStatus('定位失败：' + message + '。可改用地图点选起点。', true);
+    });
+  });
+}
+
+function locateNavigationOriginByBrowser(onFail){
+  if (!navigator.geolocation || typeof navigator.geolocation.getCurrentPosition !== 'function') {
+    onFail('当前浏览器没有原生定位能力');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(function(position){
+    if (!position || !position.coords) {
+      onFail('浏览器未返回定位结果');
+      return;
+    }
+    var point = wgs84ToGcj02(position.coords.longitude, position.coords.latitude);
+    if (!isValidLngLat(point)) {
+      onFail('浏览器返回坐标无效');
+      return;
+    }
+    setNavigationOrigin(point, '当前位置');
+  }, function(error){
+    onFail(getBrowserGeolocationErrorMessage(error));
+  }, {
+    enableHighAccuracy: true,
+    maximumAge: 1000,
+    timeout: 12000
+  });
+}
+
+function locateNavigationOriginByAmap(onFail){
+  var geolocation = getNavigationAmapGeolocation();
+  if (!geolocation) {
+    onFail('高德定位插件未加载');
+    return;
+  }
+  geolocation.getCurrentPosition(function(status, result){
+    if (status === 'complete' && result && result.position) {
+      setNavigationOrigin(lngLatLikeToArray(result.position), '当前位置');
+      return;
+    }
+    onFail(getAmapGeolocationErrorMessage(result));
+  });
+}
+
+function getNavigationAmapGeolocation(){
+  if (!AMap || !AMap.Geolocation) return null;
   if (!navigationGeolocation) {
     navigationGeolocation = new AMap.Geolocation({
       enableHighAccuracy: true,
@@ -1646,14 +1723,7 @@ function locateNavigationOrigin(){
       zoomToAccuracy: false
     });
   }
-  navigationGeolocation.getCurrentPosition(function(status, result){
-    if (status === 'complete' && result && result.position) {
-      setNavigationOrigin(lngLatLikeToArray(result.position), '当前位置');
-      return;
-    }
-    var message = result && (result.message || result.info) ? result.message || result.info : '浏览器或高德定位失败';
-    setNavigationStatus('定位失败：' + message + '。可改用地图点选起点。', true);
-  });
+  return navigationGeolocation;
 }
 
 function startPickingNavigationOrigin(){
@@ -1765,11 +1835,16 @@ function updateNavigationPanel(){
     }
   }
   if (locateBtn) locateBtn.disabled = isPickingNavigationOrigin;
-  if (pickBtn) pickBtn.textContent = isPickingNavigationOrigin ? '等待点选...' : '地图点选起点';
+  if (pickBtn) pickBtn.textContent = isPickingNavigationOrigin ? '等待点选' : '点选';
   if (planBtn) planBtn.disabled = !(navigationTarget && navigationOrigin);
   if (startTrackingBtn) startTrackingBtn.disabled = navigationTracking || !navigationRoute;
   if (stopTrackingBtn) stopTrackingBtn.disabled = !navigationTracking;
-  if (voiceInput) voiceInput.checked = navigationVoiceEnabled;
+  var testVoiceBtn = document.getElementById('testNavigationVoiceBtn');
+  if (testVoiceBtn) testVoiceBtn.textContent = isNavigationVoiceApiSupported() ? '试播语音' : '高德播报';
+  if (voiceInput) {
+    voiceInput.checked = navigationVoiceEnabled && isNavigationVoiceApiSupported();
+    voiceInput.disabled = !isNavigationVoiceApiSupported();
+  }
   updateAmapNavigationLink(linkEl);
 }
 
@@ -1786,6 +1861,16 @@ function updateAmapNavigationLink(linkEl){
   link.classList.remove('disabled');
   link.setAttribute('aria-disabled', 'false');
   link.setAttribute('href', url);
+}
+
+function openAmapNavigationFallback(){
+  var url = buildAmapNavigationUrl();
+  if (!url) {
+    updateNavigationRealtimeStatus('当前浏览器不支持网页语音。请先选择终点，再用“高德播报”打开高德 App 导航。', false);
+    return;
+  }
+  updateNavigationRealtimeStatus('当前浏览器不支持网页语音，正在打开高德导航播报。', false);
+  window.open(url, '_blank', 'noopener');
 }
 
 function updateNavigationRouteSummary(result){
@@ -1877,25 +1962,28 @@ function startNavigationTracking(){
     setNavigationStatus('请先规划路线。', true);
     return;
   }
-  if (!navigator.geolocation || typeof navigator.geolocation.watchPosition !== 'function') {
-    setNavigationStatus('当前浏览器不支持实时定位。', true);
-    return;
-  }
   stopNavigationTracking(false);
   navigationTracking = true;
   navigationArrivalSpoken = false;
+  navigationTriedAmapFallback = false;
+  startNavigationHeadingWatch();
   updateNavigationPanel();
   updateNavigationRealtimeStatus('正在启动实时定位...');
-  speakNavigation('实时导航已开始。');
-  navigationWatchId = navigator.geolocation.watchPosition(
-    handleNavigationWatchPosition,
-    handleNavigationWatchError,
-    {
-      enableHighAccuracy: true,
-      maximumAge: 1000,
-      timeout: 15000
-    }
-  );
+  initializeNavigationVoice('实时导航已开始。');
+  if (navigator.geolocation && typeof navigator.geolocation.watchPosition === 'function') {
+    navigationWatchSource = 'browser';
+    navigationWatchId = navigator.geolocation.watchPosition(
+      handleNavigationWatchPosition,
+      handleNavigationWatchError,
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 15000
+      }
+    );
+    return;
+  }
+  startAmapNavigationTracking('当前浏览器不支持原生实时定位');
 }
 
 function stopNavigationTracking(announce){
@@ -1903,6 +1991,13 @@ function stopNavigationTracking(announce){
     navigator.geolocation.clearWatch(navigationWatchId);
   }
   navigationWatchId = null;
+  if (navigationAmapWatchTimer !== null) {
+    window.clearInterval(navigationAmapWatchTimer);
+  }
+  navigationAmapWatchTimer = null;
+  navigationWatchSource = '';
+  stopNavigationHeadingWatch();
+  navigationLastUserPoint = null;
   if (navigationTracking && announce !== false) {
     speakNavigation('实时导航已停止。');
   }
@@ -1916,6 +2011,63 @@ function handleNavigationWatchPosition(position){
   var point = wgs84ToGcj02(position.coords.longitude, position.coords.latitude);
   if (!isValidLngLat(point)) return;
   var accuracy = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : 0;
+  updateNavigationFromRealtimePoint(point, accuracy, position.coords.heading);
+}
+
+function handleNavigationWatchError(error){
+  var message = error && error.message ? error.message : '实时定位失败';
+  if (!isNavigationGeolocationAllowed()) message = getNavigationGeolocationBlockedMessage();
+  if (!navigationTriedAmapFallback) {
+    startAmapNavigationTracking(message);
+    return;
+  }
+  setNavigationStatus('实时定位失败：' + message + '。可改用地图点选起点或打开高德导航。', true);
+  updateNavigationRealtimeStatus('实时定位失败：' + message, true);
+  stopNavigationTracking(false);
+}
+
+function startAmapNavigationTracking(reason){
+  navigationTriedAmapFallback = true;
+  if (navigationWatchId !== null && navigator.geolocation && typeof navigator.geolocation.clearWatch === 'function') {
+    navigator.geolocation.clearWatch(navigationWatchId);
+    navigationWatchId = null;
+  }
+  var geolocation = getNavigationAmapGeolocation();
+  if (!geolocation) {
+    setNavigationStatus('实时定位失败：' + reason + '，且高德定位插件未加载。', true);
+    updateNavigationRealtimeStatus('实时定位失败：' + reason, true);
+    stopNavigationTracking(false);
+    return;
+  }
+  navigationWatchSource = 'amap';
+  updateNavigationRealtimeStatus('浏览器定位失败，正在切换高德定位...', false);
+  pollAmapNavigationPosition(true);
+  navigationAmapWatchTimer = window.setInterval(function(){
+    pollAmapNavigationPosition(false);
+  }, 4000);
+}
+
+function pollAmapNavigationPosition(reportFailure){
+  var geolocation = getNavigationAmapGeolocation();
+  if (!geolocation) return;
+  geolocation.getCurrentPosition(function(status, result){
+    if (status === 'complete' && result && result.position) {
+      var point = lngLatLikeToArray(result.position);
+      if (!point) return;
+      var accuracy = toNumber(result.accuracy);
+      updateNavigationFromRealtimePoint(point, Number.isFinite(accuracy) ? accuracy : 0, NaN);
+      return;
+    }
+    if (reportFailure) {
+      var message = getAmapGeolocationErrorMessage(result);
+      setNavigationStatus('高德实时定位失败：' + message, true);
+      updateNavigationRealtimeStatus('高德实时定位失败：' + message, true);
+    }
+  });
+}
+
+function updateNavigationFromRealtimePoint(point, accuracy, heading){
+  updateNavigationHeadingFromPosition({coords: {heading: heading}}, point);
   navigationOrigin = {
     lnglat: point,
     label: '实时当前位置'
@@ -1931,14 +2083,6 @@ function handleNavigationWatchPosition(position){
   }
 }
 
-function handleNavigationWatchError(error){
-  var message = error && error.message ? error.message : '实时定位失败';
-  if (!isNavigationGeolocationAllowed()) message = getNavigationGeolocationBlockedMessage();
-  setNavigationStatus('实时定位失败：' + message, true);
-  updateNavigationRealtimeStatus('实时定位失败：' + message, true);
-  stopNavigationTracking(false);
-}
-
 function isNavigationGeolocationAllowed(){
   return window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 }
@@ -1947,19 +2091,33 @@ function getNavigationGeolocationBlockedMessage(){
   return '当前页面不是安全来源，手机浏览器可能禁止 GPS 定位。请使用 HTTPS 地址，或先用“地图点选起点”测试路线。';
 }
 
+function getBrowserGeolocationErrorMessage(error){
+  if (!error) return '浏览器定位失败';
+  if (error.code === 1) return '浏览器定位权限被拒绝';
+  if (error.code === 2) return '浏览器暂时无法获取位置';
+  if (error.code === 3) return '浏览器定位超时';
+  return error.message || '浏览器定位失败';
+}
+
+function getAmapGeolocationErrorMessage(result){
+  if (!result) return '高德定位失败';
+  return result.message || result.info || '高德定位失败';
+}
+
 function renderNavigationUserMarker(point, accuracy){
   if (!navigationUserMarker) {
     navigationUserMarker = new AMap.Marker({
       position: point,
       zIndex: getLayerZIndex('label') + 140,
-      offset: new AMap.Pixel(-10, -10),
+      offset: new AMap.Pixel(-17, -17),
       title: '实时当前位置',
-      content: '<div class="navigation-user-marker" aria-hidden="true"></div>'
+      content: getNavigationUserMarkerContent()
     });
     map.add(navigationUserMarker);
   } else if (typeof navigationUserMarker.setPosition === 'function') {
     navigationUserMarker.setPosition(point);
   }
+  refreshNavigationUserMarkerHeading();
   if (accuracy > 0 && AMap.Circle) {
     if (!navigationAccuracyCircle) {
       navigationAccuracyCircle = new AMap.Circle({
@@ -2011,6 +2169,7 @@ function updateNavigationProgress(point, accuracy){
     }
   }
   if (accuracy > 0) messages.push('定位精度约 ' + formatRouteDistance(accuracy));
+  if (Number.isFinite(navigationHeading)) messages.push('朝向 ' + formatNavigationHeading(navigationHeading));
   if (nearestRoute && nearestRoute.distance > NAVIGATION_OFF_ROUTE_DISTANCE) {
     messages.push('已偏离路线 ' + formatRouteDistance(nearestRoute.distance));
     maybeRerouteFrom(point);
@@ -2102,6 +2261,8 @@ function maybeRerouteFrom(point){
 function updateNavigationRealtimeStatus(message, isMuted){
   var liveEl = document.getElementById('navigationLiveInfo');
   var statusEl = document.getElementById('navigationRealtimeStatus');
+  var topbarEl = document.getElementById('navigationTopbar');
+  var topInstructionEl = document.getElementById('navigationTopInstruction');
   if (liveEl) {
     liveEl.textContent = message;
     liveEl.classList.toggle('muted', Boolean(isMuted));
@@ -2110,14 +2271,112 @@ function updateNavigationRealtimeStatus(message, isMuted){
     statusEl.textContent = navigationTracking ? '实时跟踪中。' : message;
     statusEl.classList.toggle('danger', false);
   }
+  if (topbarEl && topInstructionEl) {
+    topInstructionEl.textContent = navigationTracking ? message : '';
+    topbarEl.classList.toggle('active', Boolean(navigationTracking && message));
+  }
+}
+
+function startNavigationHeadingWatch(){
+  if (navigationHeadingListening || !window.DeviceOrientationEvent) return;
+  navigationHeadingListening = true;
+  var enable = function(){
+    window.addEventListener('deviceorientationabsolute', handleNavigationDeviceOrientation, true);
+    window.addEventListener('deviceorientation', handleNavigationDeviceOrientation, true);
+  };
+  if (typeof window.DeviceOrientationEvent.requestPermission === 'function') {
+    window.DeviceOrientationEvent.requestPermission().then(function(state){
+      if (state === 'granted') {
+        enable();
+      } else {
+        navigationHeadingListening = false;
+      }
+    }).catch(function(){
+      navigationHeadingListening = false;
+    });
+    return;
+  }
+  enable();
+}
+
+function stopNavigationHeadingWatch(){
+  if (!navigationHeadingListening) return;
+  window.removeEventListener('deviceorientationabsolute', handleNavigationDeviceOrientation, true);
+  window.removeEventListener('deviceorientation', handleNavigationDeviceOrientation, true);
+  navigationHeadingListening = false;
+}
+
+function handleNavigationDeviceOrientation(event){
+  var heading = NaN;
+  if (Number.isFinite(Number(event.webkitCompassHeading))) {
+    heading = Number(event.webkitCompassHeading);
+  } else if (event.absolute && Number.isFinite(Number(event.alpha))) {
+    heading = 360 - Number(event.alpha);
+  } else if (!Number.isFinite(navigationHeading) && Number.isFinite(Number(event.alpha))) {
+    heading = 360 - Number(event.alpha);
+  }
+  if (!Number.isFinite(heading)) return;
+  navigationHeading = normalizeNavigationHeading(heading);
+  navigationHeadingSource = 'device';
+  refreshNavigationUserMarkerHeading();
+}
+
+function updateNavigationHeadingFromPosition(position, point){
+  var gpsHeading = position && position.coords ? Number(position.coords.heading) : NaN;
+  if (Number.isFinite(gpsHeading) && gpsHeading >= 0 && navigationHeadingSource !== 'device') {
+    navigationHeading = normalizeNavigationHeading(gpsHeading);
+    navigationHeadingSource = 'gps';
+  } else if (!Number.isFinite(navigationHeading) && navigationLastUserPoint) {
+    var moved = calculateLngLatDistance(navigationLastUserPoint, point);
+    if (moved >= 1.5) {
+      navigationHeading = calculateNavigationBearing(navigationLastUserPoint, point);
+      navigationHeadingSource = 'movement';
+    }
+  }
+  navigationLastUserPoint = point;
+}
+
+function refreshNavigationUserMarkerHeading(){
+  if (!navigationUserMarker || typeof navigationUserMarker.setContent !== 'function') return;
+  navigationUserMarker.setContent(getNavigationUserMarkerContent());
+}
+
+function getNavigationUserMarkerContent(){
+  var hasHeading = Number.isFinite(navigationHeading);
+  var heading = hasHeading ? normalizeNavigationHeading(navigationHeading) : 0;
+  var className = hasHeading ? 'navigation-user-marker has-heading' : 'navigation-user-marker';
+  return '<div class="' + className + '" style="--navigation-heading:' + heading.toFixed(1) + 'deg" aria-hidden="true"><span class="navigation-user-heading"></span><span class="navigation-user-dot"></span></div>';
+}
+
+function normalizeNavigationHeading(heading){
+  var normalized = Number(heading) % 360;
+  if (normalized < 0) normalized += 360;
+  return normalized;
+}
+
+function calculateNavigationBearing(from, to){
+  var start = normalizeNavigationLngLat(from);
+  var end = normalizeNavigationLngLat(to);
+  if (!start || !end) return NaN;
+  var lat1 = start[1] * Math.PI / 180;
+  var lat2 = end[1] * Math.PI / 180;
+  var deltaLng = (end[0] - start[0]) * Math.PI / 180;
+  var y = Math.sin(deltaLng) * Math.cos(lat2);
+  var x = Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng);
+  return normalizeNavigationHeading(Math.atan2(y, x) * 180 / Math.PI);
+}
+
+function formatNavigationHeading(heading){
+  var directions = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+  var normalized = normalizeNavigationHeading(heading);
+  var index = Math.round(normalized / 45) % directions.length;
+  return directions[index] + ' ' + Math.round(normalized) + '°';
 }
 
 function speakNavigation(text, force){
-  if (!navigationVoiceEnabled && !force) return;
-  if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) {
-    updateNavigationRealtimeStatus('浏览器不支持语音播报。', false);
-    return;
-  }
+  if (!navigationVoiceEnabled) return;
+  if (!ensureNavigationVoiceSupport()) return;
   var normalized = String(text || '').trim();
   if (!normalized) return;
   var now = Date.now();
@@ -2129,8 +2388,65 @@ function speakNavigation(text, force){
   utterance.lang = 'zh-CN';
   utterance.rate = 1;
   utterance.pitch = 1;
+  var voice = getNavigationChineseVoice();
+  if (voice) utterance.voice = voice;
+  utterance.onstart = function(){
+    navigationVoiceReady = true;
+    navigationVoiceBlocked = false;
+  };
+  utterance.onerror = function(){
+    navigationVoiceBlocked = true;
+    updateNavigationRealtimeStatus('语音播报被浏览器拦截，请点击“试播”后再开始导航。', false);
+  };
   window.speechSynthesis.cancel();
+  if (typeof window.speechSynthesis.resume === 'function') {
+    window.speechSynthesis.resume();
+  }
   window.speechSynthesis.speak(utterance);
+}
+
+function initializeNavigationVoice(message){
+  if (!navigationVoiceEnabled) return false;
+  if (!ensureNavigationVoiceSupport()) return false;
+  navigationVoiceBlocked = false;
+  if (typeof window.speechSynthesis.resume === 'function') {
+    window.speechSynthesis.resume();
+  }
+  speakNavigation(message || '语音播报已开启。', true);
+  return true;
+}
+
+function ensureNavigationVoiceSupport(){
+  if (!isNavigationVoiceApiSupported()) {
+    navigationVoiceReady = false;
+    navigationVoiceBlocked = true;
+    updateNavigationRealtimeStatus(getNavigationVoiceUnavailableMessage(), false);
+    return false;
+  }
+  return true;
+}
+
+function isNavigationVoiceApiSupported(){
+  return 'speechSynthesis' in window && Boolean(window.SpeechSynthesisUtterance);
+}
+
+function getNavigationVoiceUnavailableMessage(){
+  var ua = navigator.userAgent || '';
+  var isEmbedded = /MicroMessenger|AlipayClient|DingTalk|AMap|wv\)/i.test(ua);
+  if (isEmbedded) {
+    return '当前内置浏览器不支持网页语音。请用系统 Chrome/Safari 打开本页，或点“高德导航”使用高德 App 播报。';
+  }
+  return '当前浏览器不支持网页语音。请换系统 Chrome/Safari，或点“高德导航”使用高德 App 播报。';
+}
+
+function getNavigationChineseVoice(){
+  if (!window.speechSynthesis || typeof window.speechSynthesis.getVoices !== 'function') return null;
+  var voices = window.speechSynthesis.getVoices() || [];
+  return voices.find(function(voice){
+    return voice.lang && voice.lang.toLowerCase().indexOf('zh') === 0;
+  }) || voices.find(function(voice){
+    return /chinese|mandarin|普通话|中文/i.test(voice.name || '');
+  }) || null;
 }
 
 function calculateLngLatDistance(a, b){
