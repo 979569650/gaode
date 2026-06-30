@@ -14,6 +14,7 @@ var WGS84 = 'WGS84';
 var POSTER_MODE = window.IS_POSTER_MODE === true;
 var NAVIGATION_MODE = window.IS_NAVIGATION_MODE === true;
 var MAP_STYLE_CONFIG_API = '/api/map-style-config';
+var MAP_STYLE_CONFIG_STATIC_FILE = 'config/map3d-style.json';
 var BUILDING_STYLE_AREA_MIN_POINTS = 3;
 var EXPORT_ACCELERATION_MODES = ['auto', 'gpu', 'software'];
 var EXPORT_ASPECT_RATIOS = ['16:9', '4:3'];
@@ -575,7 +576,13 @@ function clearBuildingStyleOutsideOverlay(){
 async function loadMapStyleConfig(){
   try {
     var response = await fetch(MAP_STYLE_CONFIG_API, {cache: 'no-store'});
-    if (!response.ok) throw new Error('HTTP ' + response.status);
+    if (!response.ok) {
+      var staticResponse = await fetch(MAP_STYLE_CONFIG_STATIC_FILE, {cache: 'no-store'});
+      if (!staticResponse.ok) throw new Error('HTTP ' + response.status);
+      setMapStyleConfig(await staticResponse.json());
+      setStatus('已读取静态样式配置: config/map3d-style.json');
+      return;
+    }
     var result = await response.json();
     if (!result.ok) throw new Error(result.error || '读取配置失败');
     setMapStyleConfig(result.config);

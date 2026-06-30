@@ -3,6 +3,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const DIST_DIR = path.join(ROOT, 'dist');
+const CONFIG_DIR = path.join(ROOT, 'config');
 
 function copyDxfFiles() {
   const dxfFiles = fs.readdirSync(ROOT).filter((name) => name.toLowerCase().endsWith('.dxf'));
@@ -48,11 +49,24 @@ function writeIndexPage() {
   fs.writeFileSync(path.join(DIST_DIR, 'index.html'), html, 'utf8');
 }
 
+function copyStyleConfig() {
+  const source = path.join(CONFIG_DIR, 'map3d-style.json');
+  const targetDir = path.join(DIST_DIR, 'config');
+  const target = path.join(targetDir, 'map3d-style.json');
+  if (!fs.existsSync(source)) return false;
+
+  fs.mkdirSync(targetDir, { recursive: true });
+  fs.copyFileSync(source, target);
+  return true;
+}
+
 if (!fs.existsSync(DIST_DIR)) {
   throw new Error('dist directory does not exist. Run npm run build first.');
 }
 
 const copied = copyDxfFiles();
+const copiedConfig = copyStyleConfig();
 writeIndexPage();
 console.log(`[pages] copied DXF: ${copied.join(', ')}`);
+if (copiedConfig) console.log('[pages] copied config/map3d-style.json');
 console.log('[pages] wrote dist/index.html');
