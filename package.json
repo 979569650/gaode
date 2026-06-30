@@ -7,9 +7,7 @@
     "export:poster": "node scripts/export-poster.js",
     "serve": "node scripts/export-server.js",
     "public:nav": "node scripts/start-public-navigation.js",
-    "public:nav:stop": "node scripts/start-public-navigation.js --stop",
-    "public:nav:login": "npx --yes wrangler login",
-    "public:nav:deploy": "node scripts/deploy-navigation-pages.js"
+    "public:nav:stop": "node scripts/start-public-navigation.js --stop"
   },
   "devDependencies": {
     "playwright": "^1.61.0"

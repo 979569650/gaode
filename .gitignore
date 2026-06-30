@@ -8,5 +8,3 @@ release/
 .env.*.local
 certs/
 .codegraph/
-tools/cloudflared.exe
-tools/cloudflared.exe.download
